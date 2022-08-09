@@ -4,3 +4,4 @@ zig-cache
 src/zig-cache
 .zigmod
 deps.zig
+example

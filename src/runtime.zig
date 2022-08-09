@@ -3,6 +3,8 @@ const std = @import("std");
 const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
 
+//try std.fs.makeDirAbsolute(try std.mem.concat(allocator, u8, &.{example_root, "/idk"}));
+
 pub fn extractFiles(allocator: std.mem.Allocator) anyerror!void {
     var file = try std.fs.cwd().openFile("bun", .{});
     defer file.close();

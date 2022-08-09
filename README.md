@@ -1,5 +1,5 @@
 <div align="center">
-<br><br>
+<br>
 <h1>bkg</h1><br>
 <i>
 Package Bun apps into a single executable
@@ -23,7 +23,7 @@ This is a work in progress, the compiler does not work yet.
 
 bkg and pkg (Node) have a number of differences arising either from a design decision or a Bun limitation:
 - **Sources are not compiled to bytecode:** Bun does not expose an equivalent of `v8::ScriptCompiler` yet, hence sources are kept intact in the compiled executable.
-- **File system:** bkg does not embed a virtual filesystem but instead archives the sources using the very fast LZ4 compression which are decompressed to a temporary location at runtime. This makes the resulting binary about 1/2 the size of Bun itself, while not having to keep the entire runtime in memory.
+- **File system:** bkg does not embed a virtual filesystem but instead archives the sources using the very fast [LZ4 compression](https://github.com/lz4/lz4) which are decompressed to a temporary location at runtime. This makes the resulting binary about 1/2 the size of Bun itself, while not having to keep the entire runtime in memory.
 - **Import resolution:** Unlike pkg, we do not recursively traverse through each import in the sources and package those files (yet). bkg will simply archive the entire source folder - this will change once Bun can bundle dependencies and the sources into one file.
 
 ## Key takeaways

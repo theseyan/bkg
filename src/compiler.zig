@@ -3,6 +3,51 @@ const std = @import("std");
 const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
 
+// Builds a TAR archive given a root directory
+pub fn buildArchive(allocator: std.mem.Allocator, root: []const u8) anyerror!void {
+    
+    // TAR archive
+    var tar: mtar.mtar_t = undefined;
+
+    // Open archive for writing
+    _ = mtar.mtar_open(&tar, "test.tar", "w");
+    defer _ = mtar.mtar_close(&tar);
+
+    // Recursively search for files
+    var dir = try std.fs.openDirAbsolute(root, .{ .iterate = true });
+    defer dir.close();
+    var walker = try dir.walk(allocator);
+    defer walker.deinit();
+
+    while (try walker.next()) |entry| {
+        // Skip directories
+        if(entry.kind == .Directory) continue;
+
+        // Read source into buffer
+        var file = try std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", entry.path}), .{});
+        const buf: []u8 = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
+
+        std.debug.print("Writing file {s} with {} bytes\n", .{entry.path, buf.len});
+
+        // Write buffer to archive
+        _ = mtar.mtar_write_file_header(&tar, (try allocator.dupe(u8, entry.path)).ptr, @intCast(c_uint, buf.len));
+        _ = mtar.mtar_write_data(&tar, buf.ptr, @intCast(c_uint, buf.len));
+
+        // Close & free memory for this file
+        allocator.free(buf);
+        file.close();
+    }
+
+    // Finalize the archive
+    _ = mtar.mtar_finalize(&tar);
+
+}
+
+// Applies LZ4 compression on given TAR archive
+pub fn compressArchive(allocator: std.mem.Allocator) anyerror!void {
+
+}
+
 pub fn saveCompressed(allocator: std.mem.Allocator) anyerror!void {
 
     var bun = try std.fs.cwd().openFile("lmao.txt", .{});
@@ -37,7 +82,7 @@ pub fn writeArchive() anyerror!void {
     _ = mtar.mtar_open(&tar, "test.tar", "w");
 
     // Write strings to files `test1.txt` and `test2.txt`
-    _ = mtar.mtar_write_file_header(&tar, "test1.txt", str1.len);
+    _ = mtar.mtar_write_file_header(&tar, "idk/man/test1.txt", str1.len);
     _ = mtar.mtar_write_data(&tar, str1, str1.len);
     _ = mtar.mtar_write_file_header(&tar, "test2.txt", str2.len);
     _ = mtar.mtar_write_data(&tar, str2, str2.len);
