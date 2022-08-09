@@ -1,0 +1,9 @@
+[submodule "deps/lz4"]
+	path = deps/lz4
+	url = https://github.com/lz4/lz4
+[submodule "deps/microtar"]
+	path = deps/microtar
+	url = https://github.com/rxi/microtar
+[submodule "deps/zig-clap"]
+	path = deps/zig-clap
+	url = https://github.com/Hejsil/zig-clap

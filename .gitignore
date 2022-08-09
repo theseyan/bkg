@@ -1,0 +1,6 @@
+zig-out
+zig-cache
+.vscode
+src/zig-cache
+.zigmod
+deps.zig
