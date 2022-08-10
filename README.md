@@ -10,6 +10,8 @@ Package Bun apps into a single executable
 <br><br>
 </div>
 
+bkg is a packer for Bun that can generate self-sufficient binaries from your code for multiple platforms.
+
 # WIP
 
 This is a work in progress, the compiler does not work yet.
