@@ -1,4 +1,7 @@
 // Inflates & extracts Bun & source files at runtime
+const process = std.process;
+const fs = std.fs;
+const ChildProcess = std.ChildProcess;
 const std = @import("std");
 const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
@@ -27,13 +30,15 @@ pub fn getCompressedSize(allocator: std.mem.Allocator, path: []const u8) anyerro
 // and then de-archives it to a temporary location in the filesystem
 // We prefer OS temp directory because it's always world writeable.
 // However, this may change.
-pub fn extractArchive(allocator: std.mem.Allocator, root: []const u8) anyerror!void {
+pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []const u8) anyerror!void {
+
+    //var binPath = std.fs.path.basename(try std.fs.selfExePath(try allocator.alloc(u8, 100)));
 
     // Get number of compressed bytes
-    var compSize = try getCompressedSize(allocator, "/home/theseyan/Zig/bkg/bkg");
+    var compSize = try getCompressedSize(allocator, target);
 
     // Open binary
-    var file = try std.fs.openFileAbsolute("/home/theseyan/Zig/bkg/bkg", .{});
+    var file = try std.fs.openFileAbsolute(target, .{});
     defer file.close();
 
     // Seek to start of compressed archive
@@ -100,6 +105,53 @@ pub fn extractArchive(allocator: std.mem.Allocator, root: []const u8) anyerror!v
 
     // Delete temporary archive
     try std.fs.cwd().deleteFile(bkg_extracted);
+
+}
+
+// Initiates Bun runtime after extraction
+pub fn execProcess(allocator: std.mem.Allocator, root: []const u8) anyerror!void {
+
+    // Give executable permissions to bun
+    var file = try std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", "bkg_bun"}), .{});
+    try file.chmod(755);
+
+    var cmd_args = std.ArrayList([]const u8).init(allocator);
+    defer cmd_args.deinit();
+    try cmd_args.appendSlice(&[_][]const u8{
+        try std.mem.concat(allocator, u8, &.{root, "/", "bkg_bun"}),
+        try std.mem.concat(allocator, u8, &.{root, "/", "index.js"})
+    });
+
+    // Initiate child process
+    try exec(allocator, "", cmd_args.items);
+
+}
+
+// Starts Bun as a child process, with the entry script
+// stdin, stdout & stderr are piped to parent process
+pub fn exec(a: std.mem.Allocator, cwd: []const u8, argv: []const []const u8) !void {
+    _ = cwd;
+    var child_process = ChildProcess.init(argv, a);
+
+    child_process.stdout_behavior = .Inherit;
+    child_process.spawn() catch |err| {
+        std.debug.print("The following command failed:\n", .{});
+        return err;
+    };
+
+    const term = try child_process.wait();
+    switch (term) {
+        .Exited => |code| {
+            if (code != 0) {
+                std.debug.print("The following command exited with error code {any}:\n", .{code});
+                return error.CommandFailed;
+            }
+        },
+        else => {
+            std.debug.print("The following command terminated unexpectedly:\n", .{});
+            return error.CommandFailed;
+        },
+    }
 
 }
 

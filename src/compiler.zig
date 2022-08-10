@@ -4,7 +4,7 @@ const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
 
 // Builds a TAR archive given a root directory
-pub fn buildArchive(allocator: std.mem.Allocator, root: []const u8) anyerror!void {
+pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []const u8) anyerror!void {
     
     std.debug.print("Building archive...\n", .{});
 
@@ -12,7 +12,7 @@ pub fn buildArchive(allocator: std.mem.Allocator, root: []const u8) anyerror!voi
     var tar: mtar.mtar_t = undefined;
 
     // Open archive for writing
-    _ = mtar.mtar_open(&tar, "build.tar", "w");
+    _ = mtar.mtar_open(&tar, "__bkg_build.tar", "w");
     defer _ = mtar.mtar_close(&tar);
 
     // Recursively search for files
@@ -47,7 +47,7 @@ pub fn buildArchive(allocator: std.mem.Allocator, root: []const u8) anyerror!voi
     
     // Add Bun binary to archive
     {
-        var bun = try std.fs.openFileAbsolute("/home/theseyan/.bun/bin/bun", .{});
+        var bun = try std.fs.openFileAbsolute(bun_path, .{});
         const bunBuf: []u8 = try bun.readToEndAlloc(allocator, 256 * 1024 * 1024);
 
         std.debug.print("Adding Bun binary...\n", .{});
@@ -66,18 +66,18 @@ pub fn buildArchive(allocator: std.mem.Allocator, root: []const u8) anyerror!voi
 }
 
 // Applies LZ4 compression on given TAR archive
-pub fn compressArchive(allocator: std.mem.Allocator) anyerror!void {
+pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerror!void {
     
     std.debug.print("Compressing archive...\n", .{});
 
     // Open archive and read it's contents
-    var archive = try std.fs.cwd().openFile("build.tar", .{});
+    var archive = try std.fs.cwd().openFile("__bkg_build.tar", .{});
     defer archive.close();
     const buf: []u8 = try archive.readToEndAlloc(allocator, 1024 * 1024 * 1024); // We assume the archive is < 1 GiB
     defer allocator.free(buf);
 
     // Delete temporary archive file
-    try std.fs.cwd().deleteFile("build.tar");
+    try std.fs.cwd().deleteFile("__bkg_build.tar");
 
     // Allocate 256 MiB buffer for storing compressed archive
     var compressed: []u8 = try allocator.alloc(u8, 1024 * 1024 * 256);
@@ -88,7 +88,7 @@ pub fn compressArchive(allocator: std.mem.Allocator) anyerror!void {
 
     std.debug.print("Compressed to {} bytes\n", .{compSize});
 
-    var file = try std.fs.cwd().openFile("bkg", .{.mode = .read_write});
+    var file = try std.fs.openFileAbsolute(target, .{.mode = .read_write});
     defer file.close();
 
     // Seek to end of binary
