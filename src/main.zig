@@ -1,6 +1,4 @@
 const std = @import("std");
-const lz4 = @import("translated/liblz4.zig");
-const mtar = @import("translated/libmicrotar.zig");
 const compiler = @import("compiler.zig");
 const runtime = @import("runtime.zig");
 

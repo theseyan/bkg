@@ -15,9 +15,10 @@ Package Bun apps into a single executable
 This is a work in progress, the compiler does not work yet.
 
 ## Why?
-- Distribute a single binary without any dependencies, smaller than the Bun runtime itself
+- Distribute a single binary without any external dependencies, smaller in size than Bun itself
 - Build executables for any architecture supported by Bun
 - Package any asset into the binary, not just scripts and modules
+- Although not yet possible, the goal is generating bytecode and the ability to distribute binaries stripped of sources
 
 ## Differences from `pkg`
 
