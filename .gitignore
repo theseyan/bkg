@@ -5,3 +5,5 @@ src/zig-cache
 .zigmod
 deps.zig
 example
+tmp
+bkg
