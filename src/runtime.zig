@@ -3,8 +3,6 @@ const std = @import("std");
 const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
 
-//try std.fs.makeDirAbsolute(try std.mem.concat(allocator, u8, &.{example_root, "/idk"}));
-
 // Parses a bkg binary to get the compressed size header
 pub fn getCompressedSize(allocator: std.mem.Allocator, path: []const u8) anyerror!usize {
     var file = try std.fs.openFileAbsolute(path, .{});

@@ -7,3 +7,6 @@
 [submodule "deps/zig-clap"]
 	path = deps/zig-clap
 	url = https://github.com/Hejsil/zig-clap
+[submodule "deps/known-folders"]
+	path = deps/known-folders
+	url = https://github.com/ziglibs/known-folders
