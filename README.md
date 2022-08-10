@@ -37,7 +37,7 @@ bkg and pkg (Node) have a number of differences arising either from a design dec
 - Compiler: Stream archive directly to `lz4_compress_default` instead of through the filesystem
 - Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem
 - Bundle sources (and possibly node_modules) into a single file before packaging
-- JSON build script, advanced options to include external assets
+- JSON build script, advanced options to include external assets, make compression optional
 - Bun CLI flags
 - Fork a custom build of Bun with only the JS runtime and use that instead of the official binaries
 - If size of `bun` can be brought down under 50 MB, consider executing directly from memory
