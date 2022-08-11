@@ -4,8 +4,8 @@
 <i>
 Package Bun apps into a single executable
 </i>
-<!--<br><br>
-<a href="https://lgtm.com/projects/g/theseyan/arian/context:javascript"><img alt="LGTM Grade" src="https://img.shields.io/lgtm/grade/javascript/github/theseyan/arian?logo=lgtm"></a>-->
+<br><br>
+<img alt="GitHub Workflow Status" src="https://img.shields.io/github/workflow/status/theseyan/bkg/CI">
 
 <br><br>
 </div>
