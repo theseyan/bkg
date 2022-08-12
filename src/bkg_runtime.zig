@@ -24,8 +24,8 @@ pub fn main() !void {
     selfPath = try std.fs.selfExePath(selfPath);
     var basename = std.fs.path.basename(selfPath);
 
-    // We run the app in runtime directory
-    var runtimeDir = (try knownFolders.getPath(allocator, .runtime)) orelse return error.FailedGetHomePath;
+    // We run the app in /tmp directory
+    var runtimeDir = "/tmp";
     var appDirPath = try std.mem.concat(allocator, u8, &.{runtimeDir, "/.", basename, "_runtime"});
 
     var appDir: ?void = std.fs.makeDirAbsolute(appDirPath) catch |e| switch(e) {
