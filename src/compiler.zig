@@ -16,7 +16,7 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
     defer _ = mtar.mtar_close(&tar);
 
     // Recursively search for files
-    var dir = try std.fs.openDirAbsolute(root, .{ .iterate = true });
+    var dir = try std.fs.openIterableDirAbsolute(root, .{});
     defer dir.close();
     var walker = try dir.walk(allocator);
     defer walker.deinit();

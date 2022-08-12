@@ -8,6 +8,7 @@ const mtar = @import("translated/libmicrotar.zig");
 
 // Parses a bkg binary to get the compressed size header
 pub fn getCompressedSize(allocator: std.mem.Allocator, path: []const u8) anyerror!usize {
+
     var file = try std.fs.openFileAbsolute(path, .{});
     defer file.close();
 
@@ -21,9 +22,12 @@ pub fn getCompressedSize(allocator: std.mem.Allocator, path: []const u8) anyerro
 
     // Parse into usize
     var nullIndex = std.mem.indexOfScalar(u8, buf, 0) orelse 10;   
-    var compSize = try std.fmt.parseInt(usize, buf[0..nullIndex], 0);
+    var compSize = std.fmt.parseInt(usize, buf[0..nullIndex], 0) catch {
+        return 0;
+    };
 
     return compSize;
+
 }
 
 // Extracts compressed archive from a binary, decompresses it
@@ -32,10 +36,13 @@ pub fn getCompressedSize(allocator: std.mem.Allocator, path: []const u8) anyerro
 // However, this may change.
 pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []const u8) anyerror!void {
 
-    //var binPath = std.fs.path.basename(try std.fs.selfExePath(try allocator.alloc(u8, 100)));
-
     // Get number of compressed bytes
     var compSize = try getCompressedSize(allocator, target);
+
+    // Check if executable is not packaged
+    if(compSize == 0) {
+        @panic("Runtime does not contain a package.");
+    }
 
     // Open binary
     var file = try std.fs.openFileAbsolute(target, .{});
@@ -61,7 +68,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     var decompFile = try std.fs.cwd().createFile(bkg_extracted, .{});
     var decompBytes = try decompFile.write(decompressed);
 
-    std.debug.print("Wrote {} bytes to disk\n", .{decompBytes});
+    // std.debug.print("Wrote {} bytes to disk\n", .{decompBytes});
 
     // Free decompressed buffer
     allocator.free(decompressed);
@@ -71,7 +78,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     var header: *mtar.mtar_header_t = try allocator.create(mtar.mtar_header_t);
     _ = mtar.mtar_open(&tar, bkg_extracted, "r");
 
-    std.debug.print("Reading archive...\n", .{});
+    // std.debug.print("Reading archive...\n", .{});
     
     // Iterate through the archive
     while (mtar.mtar_read_header(&tar, header) != mtar.MTAR_ENULLRECORD) {
@@ -80,11 +87,11 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
 
         // Create directory
         if(header.type == mtar.MTAR_TDIR) {
-            std.debug.print("Creating directory: {s}\n", .{name});
+            // std.debug.print("Creating directory: {s}\n", .{name});
             _ = try std.fs.makeDirAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", name}));
         }
         else if(header.type == mtar.MTAR_TREG) {
-            std.debug.print("Writing file: {s}\n", .{name});
+            // std.debug.print("Writing file: {s}\n", .{name});
 
             _ = mtar.mtar_find(&tar, name.ptr, header);
             var fileBuf: []u8 = try allocator.alloc(u8, @intCast(usize, header.size));
@@ -130,6 +137,7 @@ pub fn execProcess(allocator: std.mem.Allocator, root: []const u8) anyerror!void
 // Starts Bun as a child process, with the entry script
 // stdin, stdout & stderr are piped to parent process
 pub fn exec(a: std.mem.Allocator, cwd: []const u8, argv: []const []const u8) !void {
+    
     _ = cwd;
     var child_process = ChildProcess.init(argv, a);
 

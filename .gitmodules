@@ -10,3 +10,6 @@
 [submodule "deps/known-folders"]
 	path = deps/known-folders
 	url = https://github.com/ziglibs/known-folders
+[submodule "deps/zip"]
+	path = deps/zip
+	url = https://github.com/kuba--/zip

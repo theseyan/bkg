@@ -1,9 +1,12 @@
 zig-out
 zig-cache
 .vscode
-src/zig-cache
 .zigmod
 deps.zig
 example
 tmp
 bkg
+.gyro
+gyro.lock
+*/zig-cache
+bkg_runtime

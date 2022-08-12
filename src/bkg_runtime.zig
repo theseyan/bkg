@@ -1,0 +1,44 @@
+// This program is compiled separately as the runtime for packaging
+// It should only deal with running the packaged app
+
+// To build the runtime
+// zig build-exe src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
+// Strip debug symbols:
+// strip bkg_runtime
+
+const std = @import("std");
+const runtime = @import("runtime.zig");
+const knownFolders = @import("known-folders");
+
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+var allocator = arena.allocator();
+
+pub fn main() !void {
+
+    // De-initialize allocator when main exits
+    defer arena.deinit();
+
+    // Get path to this binary
+    var selfPath = try allocator.alloc(u8, 300);
+    selfPath = try std.fs.selfExePath(selfPath);
+    var basename = std.fs.path.basename(selfPath);
+
+    // We run the app in runtime directory
+    var runtimeDir = (try knownFolders.getPath(allocator, .runtime)) orelse return error.FailedGetHomePath;
+    var appDirPath = try std.mem.concat(allocator, u8, &.{runtimeDir, "/.", basename, "_runtime"});
+
+    var appDir: ?void = std.fs.makeDirAbsolute(appDirPath) catch |e| switch(e) {
+        error.PathAlreadyExists => null,
+        else => return error.FailedToCreateAppDir,
+    };
+
+    if(appDir != null) {
+        // Directory was created
+        try runtime.extractArchive(allocator, selfPath, appDirPath);
+    }
+
+    // Execute process
+    try runtime.execProcess(allocator, appDirPath);
+
+}

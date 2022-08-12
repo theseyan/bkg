@@ -41,5 +41,6 @@ bkg and pkg (Node) have a number of differences arising either from a design dec
 - Bundle sources (and possibly node_modules) into a single file before packaging
 - JSON build script, advanced options to include external assets, make compression optional
 - Bun CLI flags
+- Use [zfetch](https://github.com/truemedian/zfetch) instead of cURL
 - Fork a custom build of Bun with only the JS runtime and use that instead of the official binaries
 - If size of `bun` can be brought down under 50 MB, consider executing directly from memory

@@ -1,20 +1,29 @@
 const std = @import("std");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.build.Builder) !void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
     const exe = b.addExecutable("bkg", "src/main.zig");
 
     exe.linkLibC();
 
-    // Link LZ4 library
+    // Compile LZ4 library
     exe.addCSourceFile("deps/lz4/lib/lz4.c", &.{});
 
-    // Link microtar library
+    // Compile microtar library
     exe.addCSourceFile("deps/microtar/src/microtar.c", &.{});
+
+    // Compile zip library
+    exe.addCSourceFile("deps/zip/src/zip.c", &.{});
 
     // Link zig-clap library
     exe.addPackagePath("clap", "deps/zig-clap/clap.zig");
+
+    // Link cURL
+    exe.linkSystemLibrary("curl");
+
+    // Link known-folders
+    exe.addPackagePath("known-folders", "deps/known-folders/known-folders.zig");
 
     exe.setTarget(target);
     exe.setBuildMode(mode);
