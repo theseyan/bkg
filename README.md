@@ -42,17 +42,17 @@ bkg is written in Zig and compilation is fairly straightforward. The prerequisit
 
 ```console
 # Clone the repository and update submodules
-git clone https://github.com/theseyan/bkg && cd bkg
-git submodule update --init --recursive
+$ git clone https://github.com/theseyan/bkg && cd bkg
+$ git submodule update --init --recursive
 
 # Build for x86_64-linux
-zig build -Drelease-fast -target x86_64-linux
+$ zig build -Drelease-fast -target x86_64-linux
 
 # [Optional] Build runtime for x86_64-linux
-zig build-exe -target x86_64-linux src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
+$ zig build-exe -target x86_64-linux src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
 
 # Run bkg
-./zig-out/bin/bkg --help
+$ ./zig-out/bin/bkg --help
 ```
 
 # Todo
