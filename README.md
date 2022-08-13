@@ -31,6 +31,8 @@ Options:
   <str>...
 ```
 
+**Note:** As of v0.0.1, `bkg` will assume `index.js` to be the entry point of your application. This will be customizeable in the next release.
+
 ## Why?
 - Distribute a single binary that can run without Bun or any external dependencies installed
 - Build executables for any platform supported by Bun
