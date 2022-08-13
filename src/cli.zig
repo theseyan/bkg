@@ -18,10 +18,11 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
     ;
     const paramsStr = 
         \\  -h, --help             Display this help message.
-        \\  -v, --version          Display bkg version.
-        \\  -t, --target <str>     Target architecture to build for (default is Host)
         \\  -o, --output <str>     Output file name
+        \\  -t, --target <str>     Target architecture to build for (default is Host)
+        \\  --targets              Display list of supported targets
         \\  --runtime <str>        Path to custom Bun binary (not recommended)
+        \\  -v, --version          Display bkg version.
         \\  <str>...
         \\
     ;
@@ -98,6 +99,9 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         }
         else if (res.args.version) {
             debug.print("0.0.1\n", .{});
+        }
+        else if (res.args.targets) {
+            debug.print("x86_64-linux\naarch64-linux\nx86_64-macos\naarch64-macos\n", .{});
         }
         // No param provided, display help
         else {

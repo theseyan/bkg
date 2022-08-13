@@ -118,9 +118,17 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
 pub fn execProcess(allocator: std.mem.Allocator, root: []const u8) anyerror!void {
 
     // Give executable permissions to bun
-    var file = try std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", "bkg_bun"}), .{});
-    try file.chmod(755);
-    file.close();
+    var file: ?std.fs.File = std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", "bkg_bun"}), .{}) catch |e| switch(e) {
+        error.AccessDenied => null,
+        else => return error.FailedToOpenExecutable
+    };
+
+    // We get an error.AccessDenied if the file is already executable
+    // Only chmod if it isn't executable already
+    if(file != null) {
+        try file.?.chmod(755);
+        file.?.close();
+    }
 
     var cmd_args = std.ArrayList([]const u8).init(allocator);
     defer cmd_args.deinit();
