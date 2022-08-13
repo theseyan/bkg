@@ -12,13 +12,28 @@ Package Bun apps into a single executable
 
 bkg is a CLI tool that can generate self-sufficient binaries from your Bun code for multiple platforms.
 
-# WIP
+## Usage
 
-This is a work in progress, the compiler does not work yet.
+Get the [latest release](https://github.com/theseyan/bkg/releases) for your platform.
+Run `bkg --help` to get a list of options on usage.
+
+```console
+Usage: bkg [options] <ProjectDirectory>
+
+Options:
+  -h, --help             Display this help message.
+  -o, --output <str>     Output file name
+  -t, --target <str>     Target architecture to build for (default is Host)
+  --targets              Display list of supported targets
+  --runtime <str>        Path to custom Bun binary (not recommended)
+  -v, --version          Display bkg version.
+  <str>...
+```
 
 ## Why?
-- Distribute a single binary without any external dependencies, smaller in size than Bun itself
-- Build executables for any architecture supported by Bun
+- Distribute a single binary that can run without Bun or any external dependencies installed
+- Build executables for any platform supported by Bun
+- Around 1/2 the size of Bun runtime
 - Package any asset into the binary, not just scripts and modules
 - No performance regression except for the first startup
 - Although not yet possible, the goal is generating bytecode and the ability to distribute binaries stripped of sources
