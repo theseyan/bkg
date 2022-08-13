@@ -24,11 +24,13 @@ pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const
         else => null
     };
     if(file != null) {
-        try file.?.chmod(755);
+        try file.?.chmod(0o777);
         file.?.close();
     }else {
         std.debug.print("Could not mark binary as executable. Run `chmod +x {s}` to do it manually.\n", .{std.fs.path.basename(out)});
     }
+
+    //std.debug.print("Run `chmod +x {s}` to make binary executable.\n", .{std.fs.path.basename(out)});
 
     _ = target;
     return out;

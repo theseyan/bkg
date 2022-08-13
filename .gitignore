@@ -10,3 +10,4 @@ bkg
 gyro.lock
 */zig-cache
 bkg_runtime
+build

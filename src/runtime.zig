@@ -15,7 +15,7 @@ pub fn getCompressedSize(allocator: std.mem.Allocator, path: []const u8) anyerro
     // Seek to 10 bytes before the end
     var stat = try file.stat();
     try file.seekTo(stat.size - 10);
-
+    
     // Read 10 bytes
     const buf: []u8 = try file.readToEndAlloc(allocator, 1024);
     defer allocator.free(buf);
@@ -126,7 +126,7 @@ pub fn execProcess(allocator: std.mem.Allocator, root: []const u8) anyerror!void
     // We get an error.AccessDenied if the file is already executable
     // Only chmod if it isn't executable already
     if(file != null) {
-        try file.?.chmod(755);
+        try file.?.chmod(0o755);
         file.?.close();
     }
 
