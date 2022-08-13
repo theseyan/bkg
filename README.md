@@ -33,9 +33,31 @@ bkg and pkg (Node) have a number of differences arising either from a design dec
 ## Key takeaways
 
 - bkg is **not** meant for very dynamic environments (for eg. serverless), as it adds considerable overhead to startup time. However, this overhead is only valid for the first start as the decompressed sources are cached in the filesystem onwards.
-- It is not recommended to perform `fs` operations with relative paths, as there is no guarantee where the sources may be placed at runtime. This may be fixed when I complete overriding some of the `fs` default paths.
+- It is not recommended to perform `fs` operations with relative paths, as there is no guarantee where the sources may be placed at runtime. This will be fixed when I complete overriding some of `fs` default paths.
+- Generated executables must not be stripped or the embedded code sources get corrupted.
 
-## Todo
+# Building from source
+bkg is written in Zig and compilation is fairly straightforward. The prequesites are:
+- Zig version [0.10.0-dev.3554+bfe8a4d9f](https://ziglang.org/builds/zig-0.10.0-dev.3554+bfe8a4d9f.tar.xz)
+
+```bash
+# Clone the repository
+git clone https://github.com/theseyan/bkg && cd bkg
+
+# Update submodules
+git submodule update --init --recursive
+
+# Build for x86_64-linux
+zig build -Drelease-fast -target x86_64-linux
+
+# [Optional] Build runtime for x86_64-linux
+zig build-exe -target x86_64-linux src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
+
+# Run bkg
+./zig-out/bin/bkg --help
+```
+
+# Todo
 
 - Compiler: Stream archive directly to `lz4_compress_default` instead of through the filesystem
 - Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.
