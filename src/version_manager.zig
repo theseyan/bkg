@@ -2,12 +2,13 @@
 // Handles binaries for multiple architectures and their versions
 const std = @import("std");
 const json = std.json;
-const cURL = @import("translated/libcurl.zig");
 const knownFolders = @import("known-folders");
 const zip = @import("translated/libzip.zig");
+const zfetch = @import("zfetch");
 
-// GitHub API URL for fetching latest Bun release
+// GitHub API URL for fetching latest Bun & bkg releases
 const bunLatestAPI = "https://api.github.com/repos/oven-sh/bun/releases/latest";
+const bkgLatestAPI = "https://api.github.com/repos/theseyan/bkg/releases/latest";
 
 // Holds the allocator
 var vmAllocator: *const std.mem.Allocator = undefined;
@@ -33,8 +34,8 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         }
     };
 
-    // Initialize cURL
-    if (cURL.curl_global_init(cURL.CURL_GLOBAL_ALL) != cURL.CURLE_OK) return error.CURLGlobalInitFailed;
+    // Initialize zfetch
+    try zfetch.init();
 
     // Save pointer to allocator
     vmAllocator = &allocator;
@@ -42,9 +43,85 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
 }
 
 // De-initializes Version Manager
-pub fn deinit() anyerror!void {
+pub fn deinit() void {
 
-    cURL.curl_global_cleanup();
+    zfetch.deinit();
+
+}
+
+// Custom downloader that respects HTTP 3xx redirects
+pub fn download(url: []const u8, path: []const u8) !usize {
+
+    // Init headers and request
+    var headers = zfetch.Headers.init(vmAllocator.*);
+    defer headers.deinit();
+    var req = try zfetch.Request.init(vmAllocator.*, url, null);
+    defer req.deinit();
+
+    // Perform request
+    try headers.appendValue("Accept", "application/octet-stream");
+    try headers.appendValue("User-Agent", "theseyan/bkg");
+    try req.do(.GET, headers, null);
+
+    // Follow 3xx redirects
+    if (req.status.code > 300 and req.status.code < 400) {
+        var locationHeader = req.headers.search("Location");
+        return download(locationHeader.?.value, path);
+    }
+    // If status is neither 200 or 3xx
+    else if(req.status.code != 200) {
+        return error.DownloadFailed;
+    }
+
+    // Create file on disk
+    const file = try std.fs.createFileAbsolute(path, .{});
+    const writer = file.writer();
+    const reader = req.reader();
+
+    // Write download buffer to file
+    var size: usize = 0;
+    var buf: [65535]u8 = undefined;
+    while (true) {
+        const read = try reader.read(&buf);
+        if (read == 0) break;
+        size += read;
+        try writer.writeAll(buf[0..read]);
+    }
+
+    return size;
+
+}
+
+// Custom fetch that respects 3xx redirects
+// Returns a buffer that must be freed manually
+pub fn fetch(url: []const u8) ![]const u8 {
+
+    // Init headers and request
+    var headers = zfetch.Headers.init(vmAllocator.*);
+    defer headers.deinit();
+    var req = try zfetch.Request.init(vmAllocator.*, url, null);
+    defer req.deinit();
+
+    // Perform request
+    try headers.appendValue("Accept", "*/*");
+    try headers.appendValue("User-Agent", "theseyan/bkg");
+    try req.do(.GET, headers, null);
+
+    // Follow 3xx redirects
+    if (req.status.code > 300 and req.status.code < 400) {
+        var locationHeader = req.headers.search("Location");
+        return fetch(locationHeader.?.value);
+    }
+    // If status is neither 200 or 3xx
+    else if(req.status.code != 200) {
+        return error.FetchFailed;
+    }
+
+    // Read response buffer
+    const reader = req.reader();
+    const buffer = try reader.readAllAlloc(vmAllocator.*, 8 * 1024 * 1024); // Response body should not exceed 8 MiB
+
+    return buffer;
 
 }
 
@@ -52,27 +129,12 @@ pub fn deinit() anyerror!void {
 // example: bun-v0.1.7
 pub fn getLatestBunVersion() anyerror![]const u8 {
 
-    const handle = cURL.curl_easy_init() orelse return error.CURLHandleInitFailed;
-    defer cURL.curl_easy_cleanup(handle);
-
-    var response_buffer = std.ArrayList(u8).init(vmAllocator.*);
-    defer response_buffer.deinit();
-
-    // Set cURL options
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_URL, bunLatestAPI) != cURL.CURLE_OK) return error.CouldNotSetURL;
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_USERAGENT, "theseyan/bkg") != cURL.CURLE_OK) return error.CouldNotSetUserAgent;
-
-    // Set up callbacks
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_WRITEFUNCTION, curlWriteToArrayListCallback) != cURL.CURLE_OK) return error.CouldNotSetWriteCallback;
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_WRITEDATA, &response_buffer) != cURL.CURLE_OK) return error.CouldNotSetWriteCallback;
-
-    // Execute HTTP request
-    if (cURL.curl_easy_perform(handle) != cURL.CURLE_OK)
-        return error.FailedToPerformRequest;
+    var response_buffer = try fetch(bunLatestAPI);
+    defer vmAllocator.*.free(response_buffer);
 
     // Parse JSON
     var config: APIReleaseTag = x: {
-        var stream = json.TokenStream.init(response_buffer.items);
+        var stream = json.TokenStream.init(response_buffer);
         const res = json.parse(APIReleaseTag, &stream, .{.allocator = vmAllocator.*, .ignore_unknown_fields = true});
         break :x res catch |e| {
             std.debug.print("Error while parsing JSON: {}\n", .{e});
@@ -94,15 +156,13 @@ pub fn downloadBun(version: []const u8, arch: []const u8) anyerror![]const u8 {
     // Construct URL to bun release
     const postfix = try getBunTargetString(arch);
     var releaseUrl = try std.mem.concat(vmAllocator.*, u8, &.{"https://github.com/oven-sh/bun/releases/download/", version, "/bun-", postfix, ".zip"});
-    var releaseUrlZ = try vmAllocator.*.dupeZ(u8, releaseUrl);
-    defer vmAllocator.*.free(releaseUrlZ);
 
     const homeDir = (try knownFolders.getPath(vmAllocator.*, knownFolders.KnownFolder.home)) orelse @panic("Failed to get path to home directory.");
-    const runtimeDir = try std.mem.concatWithSentinel(vmAllocator.*, u8, &.{homeDir, "/.bkg/runtime"}, 0);
+    const runtimeDir = try std.mem.concat(vmAllocator.*, u8, &.{homeDir, "/.bkg/runtime"});
 
     // Formatted as {tag}-{target}/bun-{target}/bun
     // example: bun-v0.1.8-linux-x64/bun-x64-linux/bun
-    const bunPath = try std.mem.concatWithSentinel(vmAllocator.*, u8, &.{homeDir, "/.bkg/runtime/", version, "-", postfix, "/bun-", postfix, "/bun"}, 0);
+    const bunPath = try std.mem.concat(vmAllocator.*, u8, &.{homeDir, "/.bkg/runtime/", version, "-", postfix, "/bun-", postfix, "/bun"});
     const bunZipPath = try std.mem.concatWithSentinel(vmAllocator.*, u8, &.{homeDir, "/.bkg/runtime/", version, "-", postfix, ".zip"}, 0);
     const extractDir = try std.mem.concatWithSentinel(vmAllocator.*, u8, &.{runtimeDir, "/", version, "-", postfix}, 0);
 
@@ -124,37 +184,8 @@ pub fn downloadBun(version: []const u8, arch: []const u8) anyerror![]const u8 {
         return bunPath;
     }
 
-    // Get handle to cURL
-    const handle = cURL.curl_easy_init() orelse return error.CURLHandleInitFailed;
-    defer cURL.curl_easy_cleanup(handle);
-
-    // Allocate buffer for downloading
-    var response_buffer = std.ArrayList(u8).init(vmAllocator.*);
-    defer response_buffer.deinit();
-    
-    var headersList: ?*cURL.curl_slist = null;
-    defer cURL.curl_slist_free_all(headersList);
-    headersList = cURL.curl_slist_append(headersList, "Accept: application/octet-stream");
-
-    // Set cURL options
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_URL, releaseUrlZ.ptr) != cURL.CURLE_OK) return error.CouldNotSetURL;
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_HTTPHEADER, headersList) != cURL.CURLE_OK) return error.CouldNotSetAcceptEncoding;
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_USERAGENT, "theseyan/bkg") != cURL.CURLE_OK) return error.CouldNotSetUserAgent;
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_FOLLOWLOCATION, @intCast(c_long, 1)) != cURL.CURLE_OK) return error.CouldNotSetFollowLocation;
-
-    // Set up callbacks
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_WRITEFUNCTION, curlWriteToArrayListCallback) != cURL.CURLE_OK) return error.CouldNotSetWriteCallback;
-    if (cURL.curl_easy_setopt(handle, cURL.CURLOPT_WRITEDATA, &response_buffer) != cURL.CURLE_OK) return error.CouldNotSetWriteCallback;
-
-    // Execute HTTP request
-    if (cURL.curl_easy_perform(handle) != cURL.CURLE_OK) return error.FailedToPerformRequest;
-
-    // Create file on disk
-    var file = try std.fs.createFileAbsolute(bunZipPath, .{});
-    defer file.close();
-
     // Write to file
-    var written = try file.write(response_buffer.items);
+    var written = try download(releaseUrl, bunZipPath);
     std.debug.print("Downloaded {any} bytes to disk\n", .{written});
     std.debug.print("Extracting to {s}...\n", .{extractDir});
 
@@ -175,7 +206,20 @@ pub fn downloadBun(version: []const u8, arch: []const u8) anyerror![]const u8 {
 // example: v0.0.1
 pub fn getLatestBkgVersion() anyerror![]const u8 {
     
-    return "v0.0.1";
+    var response_buffer = try fetch(bkgLatestAPI);
+    defer vmAllocator.*.free(response_buffer);
+
+    // Parse JSON
+    var config: APIReleaseTag = x: {
+        var stream = json.TokenStream.init(response_buffer);
+        const res = json.parse(APIReleaseTag, &stream, .{.allocator = vmAllocator.*, .ignore_unknown_fields = true});
+        break :x res catch |e| {
+            std.debug.print("Error while parsing JSON: {}\n", .{e});
+            return error.ErrorParsingJSON;
+        };
+    };
+
+    return config.tag_name;
 
 }
 
@@ -186,6 +230,37 @@ pub fn downloadRuntime(version: []const u8, arch: []const u8) anyerror![]const u
 
     const homePath = (try knownFolders.getPath(vmAllocator.*, knownFolders.KnownFolder.home)) orelse return error.CannotGetHomePath;
     const runtimePath = try std.mem.concat(vmAllocator.*, u8, &.{homePath, "/.bkg/bkg_runtime/", arch, "/bkg_runtime-", version});
+    const runtimeDir = try std.mem.concat(vmAllocator.*, u8, &.{homePath, "/.bkg/bkg_runtime"});
+
+    std.debug.print("Downloading bkg runtime {s} for target {s}...\n", .{version, arch});
+
+    // Construct URL to download release
+    var releaseUrl = try std.mem.concat(vmAllocator.*, u8, &.{"https://github.com/theseyan/bkg/releases/download/", version, "/bkg_runtime-", version, "-", arch});
+
+    // Create /bkg_runtime and {arch} directory if it doesn't already exist
+    _ = std.fs.openDirAbsolute(runtimeDir, .{}) catch |e| {
+        if(e == error.FileNotFound) try std.fs.makeDirAbsolute(runtimeDir);
+    };
+    _ = std.fs.openDirAbsolute(try std.mem.concat(vmAllocator.*, u8, &.{runtimeDir, "/", arch}), .{}) catch |e| {
+        if(e == error.FileNotFound) try std.fs.makeDirAbsolute(try std.mem.concat(vmAllocator.*, u8, &.{runtimeDir, "/", arch}));
+    };
+
+    // Check if the binary already exists
+    const bin: ?std.fs.File = std.fs.openFileAbsolute(runtimePath, .{}) catch |err| switch (err) {
+        error.FileNotFound => null,
+        else => return err,
+    };
+
+    // Return if it already exists
+    if (bin) |f| {
+        f.close();
+        std.debug.print("bkg runtime already exists, skipping\n", .{});
+        return runtimePath;
+    }
+
+    // Download the file
+    const written = try download(releaseUrl, runtimePath);
+    std.debug.print("Downloaded {any} bytes to disk\n", .{written});
 
     return runtimePath;
 

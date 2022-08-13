@@ -19,6 +19,17 @@ pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const
     // Rename executable
     try std.fs.renameAbsolute("/tmp/__bkg_build_runtime", out);
 
+    // Give executable permissions
+    var file: ?std.fs.File = std.fs.openFileAbsolute(out, .{}) catch |e| switch(e) {
+        else => null
+    };
+    if(file != null) {
+        try file.?.chmod(755);
+        file.?.close();
+    }else {
+        std.debug.print("Could not mark binary as executable. Run `chmod +x {s}` to do it manually.\n", .{std.fs.path.basename(out)});
+    }
+
     _ = target;
     return out;
 
@@ -68,10 +79,10 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
     
     // Add Bun binary to archive
     {
+        std.debug.print("Adding Bun binary...\n", .{});
         var bun = try std.fs.openFileAbsolute(bun_path, .{});
         const bunBuf: []u8 = try bun.readToEndAlloc(allocator, 256 * 1024 * 1024);
 
-        std.debug.print("Adding Bun binary...\n", .{});
         _ = mtar.mtar_write_file_header(&tar, "bkg_bun", @intCast(c_uint, bunBuf.len));
         _ = mtar.mtar_write_data(&tar, bunBuf.ptr, @intCast(c_uint, bunBuf.len));
 

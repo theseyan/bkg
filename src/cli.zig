@@ -79,6 +79,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
 
         // Initialize version manager
         try versionManager.init(allocator);
+        defer versionManager.deinit();
 
         // Make sure we have the latest Bun and bkg runtime for the target
         var runtimePath = try versionManager.downloadBun(try versionManager.getLatestBunVersion(), target);

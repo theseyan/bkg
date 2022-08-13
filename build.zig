@@ -1,4 +1,5 @@
 const std = @import("std");
+const zfetch = @import("deps/zfetch/build.zig");
 
 pub fn build(b: *std.build.Builder) !void {
     const target = b.standardTargetOptions(.{});
@@ -19,8 +20,8 @@ pub fn build(b: *std.build.Builder) !void {
     // Link zig-clap library
     exe.addPackagePath("clap", "deps/zig-clap/clap.zig");
 
-    // Link cURL
-    exe.linkSystemLibrary("curl");
+    // Link zfetch
+    exe.addPackage(try zfetch.getPackage(b));
 
     // Link known-folders
     exe.addPackagePath("known-folders", "deps/known-folders/known-folders.zig");

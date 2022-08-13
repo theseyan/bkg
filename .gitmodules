@@ -13,3 +13,6 @@
 [submodule "deps/zip"]
 	path = deps/zip
 	url = https://github.com/kuba--/zip
+[submodule "deps/zfetch"]
+	path = deps/zfetch
+	url = https://github.com/truemedian/zfetch

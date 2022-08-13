@@ -40,13 +40,13 @@ bkg and pkg (Node) have a number of differences arising either from a design dec
 bkg is written in Zig and compilation is fairly straightforward. The prerequisites are:
 - Zig version [0.10.0-dev.3554+bfe8a4d9f](https://ziglang.org/builds/zig-0.10.0-dev.3554+bfe8a4d9f.tar.xz)
 
-```properties
+```bash
 # Clone the repository and update submodules
 git clone https://github.com/theseyan/bkg && cd bkg
 git submodule update --init --recursive
 
 # Build for x86_64-linux
-zig build -Drelease-fast -target x86_64-linux
+zig build -Drelease-fast -Dtarget=x86_64-linux
 
 # [Optional] Build runtime for x86_64-linux
 zig build-exe -target x86_64-linux src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
@@ -59,9 +59,11 @@ zig build-exe -target x86_64-linux src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c de
 
 - Compiler: Stream archive directly to `lz4_compress_default` instead of through the filesystem
 - Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.
+- Pass CLI args to javascript
+- Use [uuid](https://github.com/dmgk/zig-uuid) temporary directory naming to prevent possible naming conflicts
 - Bundle sources (and possibly node_modules) into a single file before packaging
 - JSON build script, advanced options to include external assets, make compression optional
 - Bun CLI flags
-- Use [zfetch](https://github.com/truemedian/zfetch) instead of cURL
+- :white_check_mark: ~~Use [zfetch](https://github.com/truemedian/zfetch) instead of cURL~~
 - Fork a custom build of Bun with only the JS runtime and use that instead of the official binaries
 - If size of `bun` can be brought down under 50 MB, consider executing directly from memory
