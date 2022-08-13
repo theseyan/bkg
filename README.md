@@ -40,19 +40,19 @@ bkg and pkg (Node) have a number of differences arising either from a design dec
 bkg is written in Zig and compilation is fairly straightforward. The prerequisites are:
 - Zig version [0.10.0-dev.3554+bfe8a4d9f](https://ziglang.org/builds/zig-0.10.0-dev.3554+bfe8a4d9f.tar.xz)
 
-```console
+```properties
 # Clone the repository and update submodules
-$ git clone https://github.com/theseyan/bkg && cd bkg
-$ git submodule update --init --recursive
+git clone https://github.com/theseyan/bkg && cd bkg
+git submodule update --init --recursive
 
 # Build for x86_64-linux
-$ zig build -Drelease-fast -target x86_64-linux
+zig build -Drelease-fast -target x86_64-linux
 
 # [Optional] Build runtime for x86_64-linux
-$ zig build-exe -target x86_64-linux src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
+zig build-exe -target x86_64-linux src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
 
 # Run bkg
-$ ./zig-out/bin/bkg --help
+./zig-out/bin/bkg --help
 ```
 
 # Todo
