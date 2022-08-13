@@ -69,6 +69,10 @@ zig build-exe -target x86_64-linux src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c de
 
 # Run bkg
 ./zig-out/bin/bkg --help
+
+# OR, build runtime and CLI for all platforms
+# Generated executables are placed in /build
+chmod +x build.sh && ./build.sh
 ```
 
 # Todo
