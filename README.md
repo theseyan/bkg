@@ -10,7 +10,7 @@ Package Bun apps into a single executable
 <br><br>
 </div>
 
-bkg is a packer for Bun that can generate self-sufficient binaries from your code for multiple platforms.
+bkg is a CLI tool that can generate self-sufficient binaries from your Bun code for multiple platforms.
 
 # WIP
 
@@ -20,6 +20,7 @@ This is a work in progress, the compiler does not work yet.
 - Distribute a single binary without any external dependencies, smaller in size than Bun itself
 - Build executables for any architecture supported by Bun
 - Package any asset into the binary, not just scripts and modules
+- No performance regression except for the first startup
 - Although not yet possible, the goal is generating bytecode and the ability to distribute binaries stripped of sources
 
 ## Differences from `pkg`
@@ -37,7 +38,7 @@ bkg and pkg (Node) have a number of differences arising either from a design dec
 ## Todo
 
 - Compiler: Stream archive directly to `lz4_compress_default` instead of through the filesystem
-- Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem
+- Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.
 - Bundle sources (and possibly node_modules) into a single file before packaging
 - JSON build script, advanced options to include external assets, make compression optional
 - Bun CLI flags

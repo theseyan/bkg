@@ -1,25 +1,14 @@
 // bkg CLI
 const std = @import("std");
 const clap = @import("clap");
-const compiler = @import("compiler.zig");
 const knownFolders = @import("known-folders");
+const compiler = @import("compiler.zig");
+const versionManager = @import("version_manager.zig");
 const debug = std.debug;
 const io = std.io;
 
-// Path to project directory for archiving
-var projectDirectory = undefined;
-
-// Path to temporary directory used as cache
-const tempDir = "/tmp";
-
-// Path to bun binary to package
-var bun = "/home/theseyan/.bun/bin/bun";
-
-// Path to bkg runtime executable
-var targetExe = "/home/theseyan/Zig/bkg/bkg_runtime";
-
 // Initializes CLI environment
-pub fn init() anyerror!void {
+pub fn init(allocator: std.mem.Allocator) anyerror!void {
 
     // Parameters & head strings
     const head = 
@@ -50,7 +39,56 @@ pub fn init() anyerror!void {
 
     // <ProjectDirectory> is provided
     if(res.positionals.len > 0) {
-        std.debug.print("{s}\n", .{res.positionals[0]});
+
+        // Absolute path to input directory
+        var project: []const u8 = try std.fs.realpathAlloc(allocator, res.positionals[0]);
+        defer allocator.free(project);
+
+        // Target string to build for
+        // example: x86_64-linux
+        var target: []const u8 = undefined;
+
+        // Absolute output path of the resulting executable
+        var output: []const u8 = undefined;
+
+        // TODO: Ability to use custom Bun binary
+        if(res.args.runtime != null) {
+            debug.print("Custom bun binary is not supported in this version, prebuilt will be used.\n", .{});
+        }
+
+        // Get build target
+        if(res.args.target != null) {
+            target = res.args.target.?;
+            debug.print("Building for target {s}\n", .{res.args.target.?});
+        }else {
+            target = try compiler.getHostTargetString(allocator);
+            debug.print("No target was specified, building for {s}\n", .{target});
+        }
+
+        // Get output path
+        if(res.args.output != null) {
+            var basename = std.fs.path.basename(res.args.output.?);
+            var dirname = std.fs.path.dirname(res.args.output.?) orelse ".";
+            output = try std.mem.concat(allocator, u8, &.{try std.fs.realpathAlloc(allocator, dirname), "/", basename});
+        }else {
+            var cwdPath = try std.fs.realpathAlloc(allocator, ".");
+            defer allocator.free(cwdPath);
+            output = try std.mem.concat(allocator, u8, &.{cwdPath, "/app"});
+        }
+
+        // Initialize version manager
+        try versionManager.init(allocator);
+
+        // Make sure we have the latest Bun and bkg runtime for the target
+        var runtimePath = try versionManager.downloadBun(try versionManager.getLatestBunVersion(), target);
+        var bkgRuntimePath = try versionManager.downloadRuntime(try versionManager.getLatestBkgVersion(), target);
+
+        // Build the executable
+        var out = try compiler.build(allocator, runtimePath, bkgRuntimePath, target, project, output);
+
+        // Finish up
+        std.debug.print("Built {s} for target {s}.\n", .{std.fs.path.basename(out), target});
+
     }
     // Parse other CLI flags
     else {

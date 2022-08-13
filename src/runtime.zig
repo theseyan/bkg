@@ -67,8 +67,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     const bkg_extracted = "bkg_extracted";
     var decompFile = try std.fs.cwd().createFile(bkg_extracted, .{});
     var decompBytes = try decompFile.write(decompressed);
-
-    // std.debug.print("Wrote {} bytes to disk\n", .{decompBytes});
+    _ = decompBytes;
 
     // Free decompressed buffer
     allocator.free(decompressed);
@@ -121,6 +120,7 @@ pub fn execProcess(allocator: std.mem.Allocator, root: []const u8) anyerror!void
     // Give executable permissions to bun
     var file = try std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", "bkg_bun"}), .{});
     try file.chmod(755);
+    file.close();
 
     var cmd_args = std.ArrayList([]const u8).init(allocator);
     defer cmd_args.deinit();

@@ -2,6 +2,27 @@
 const std = @import("std");
 const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
+const builtin = @import("builtin");
+
+// Performs the build process for a given Bun binary, target, project path and output path
+pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const u8, target: []const u8, project: []const u8, out: []const u8) anyerror![]const u8 {
+
+    // Build archive
+    try buildArchive(allocator, bunPath, project);
+
+    // Copy bkg runtime to temporary directory
+    try std.fs.copyFileAbsolute(bkgPath, "/tmp/__bkg_build_runtime", .{});
+
+    // Apply compression and add to binary
+    try compressArchive(allocator, "/tmp/__bkg_build_runtime");
+
+    // Rename executable
+    try std.fs.renameAbsolute("/tmp/__bkg_build_runtime", out);
+
+    _ = target;
+    return out;
+
+}
 
 // Builds a TAR archive given a root directory
 pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []const u8) anyerror!void {
@@ -12,7 +33,7 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
     var tar: mtar.mtar_t = undefined;
 
     // Open archive for writing
-    _ = mtar.mtar_open(&tar, "__bkg_build.tar", "w");
+    _ = mtar.mtar_open(&tar, "/tmp/__bkg_build.tar", "w");
     defer _ = mtar.mtar_close(&tar);
 
     // Recursively search for files
@@ -71,13 +92,13 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
     std.debug.print("Compressing archive...\n", .{});
 
     // Open archive and read it's contents
-    var archive = try std.fs.cwd().openFile("__bkg_build.tar", .{});
+    var archive = try std.fs.cwd().openFile("/tmp/__bkg_build.tar", .{});
     defer archive.close();
     const buf: []u8 = try archive.readToEndAlloc(allocator, 1024 * 1024 * 1024); // We assume the archive is < 1 GiB
     defer allocator.free(buf);
 
     // Delete temporary archive file
-    try std.fs.cwd().deleteFile("__bkg_build.tar");
+    try std.fs.cwd().deleteFile("/tmp/__bkg_build.tar");
 
     // Allocate 256 MiB buffer for storing compressed archive
     var compressed: []u8 = try allocator.alloc(u8, 1024 * 1024 * 256);
@@ -112,6 +133,30 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
         _ = try file.write(compSizeBuffer);
     }
     std.debug.print("Done\n", .{});
+
+}
+
+// Creates and returns a standard target string for Host OS
+pub fn getHostTargetString(allocator: std.mem.Allocator) ![]const u8 {
+
+    const tag = builtin.target.os.tag;
+    const arch = builtin.target.cpu.arch;
+    
+    var tagStr = switch(tag) {
+        .windows => "windows",
+        .linux => "linux",
+        .macos => "macos",
+        else => return error.UnknownOs
+    };
+
+    var archStr = switch(arch) {
+        .aarch64 => "aarch64",
+        .x86_64 => "x86_64",
+        else => return error.UnknownCpu
+    };
+
+    const target = try std.mem.concat(allocator, u8, &.{archStr, "-", tagStr});
+    return target;
 
 }
 

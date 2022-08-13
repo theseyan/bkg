@@ -87,7 +87,7 @@ pub fn getLatestBunVersion() anyerror![]const u8 {
 // Downloads Bun binary for a given version and platform
 // Returns immediately if the binary already exists
 // example: bun-v0.1.8, aarch64-linux
-pub fn downloadBun(version: []const u8, arch: []const u8) anyerror!void {
+pub fn downloadBun(version: []const u8, arch: []const u8) anyerror![]const u8 {
 
     std.debug.print("Downloading {s} for target {s}...\n", .{version, arch});
 
@@ -114,14 +114,14 @@ pub fn downloadBun(version: []const u8, arch: []const u8) anyerror!void {
     // Check if the binary already exists
     const bin: ?std.fs.File = std.fs.openFileAbsolute(bunPath, .{}) catch |err| switch (err) {
         error.FileNotFound => null,
-        else => return,
+        else => return err,
     };
 
     // Return if it already exists
     if (bin) |f| {
         f.close();
         std.debug.print("Runtime already exists, skipping\n", .{});
-        return;
+        return bunPath;
     }
 
     // Get handle to cURL
@@ -159,7 +159,6 @@ pub fn downloadBun(version: []const u8, arch: []const u8) anyerror!void {
     std.debug.print("Extracting to {s}...\n", .{extractDir});
 
     _ = runtimeDir;
-    _ = bunPath;
 
     // Extract the zip archive
     var arg: c_int = 2;
@@ -167,6 +166,28 @@ pub fn downloadBun(version: []const u8, arch: []const u8) anyerror!void {
 
     // Delete the archive since it's no longer needed
     try std.fs.deleteFileAbsolute(bunZipPath);
+
+    return bunPath;
+
+}
+
+// Fetches the latest release tag from bkg's GitHub repo
+// example: v0.0.1
+pub fn getLatestBkgVersion() anyerror![]const u8 {
+    
+    return "v0.0.1";
+
+}
+
+// Downloads bkg runtime binary for a given version and platform
+// Returns immediately if the binary already exists
+// example: v0.0.1, aarch64-linux
+pub fn downloadRuntime(version: []const u8, arch: []const u8) anyerror![]const u8 {
+
+    const homePath = (try knownFolders.getPath(vmAllocator.*, knownFolders.KnownFolder.home)) orelse return error.CannotGetHomePath;
+    const runtimePath = try std.mem.concat(vmAllocator.*, u8, &.{homePath, "/.bkg/bkg_runtime/", arch, "/bkg_runtime-", version});
+
+    return runtimePath;
 
 }
 
@@ -182,9 +203,9 @@ pub fn getBunTargetString(target: []const u8) ![]const u8 {
         return "linux-x64";
     }else if(std.mem.eql(u8, target, "aarch64-linux")) {
         return "linux-aarch64";
-    }else if(std.mem.eql(u8, target, "x86_64-darwin")) {
+    }else if(std.mem.eql(u8, target, "x86_64-macos")) {
         return "darwin-x64";
-    }else if(std.mem.eql(u8, target, "aarch64-darwin")) {
+    }else if(std.mem.eql(u8, target, "aarch64-macos")) {
         return "darwin-aarch64";
     }else {
         return error.UnknownTarget;
