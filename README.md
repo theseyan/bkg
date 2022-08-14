@@ -30,8 +30,13 @@ Options:
   -v, --version          Display bkg version.
   <str>...
 ```
-
-**Note:** As of v0.0.1, bkg assumes `index.js` to be the entry point of your application. This will be customizeable from the next release.
+### `bkg.config.json`
+bkg assumes `index.js` to be the entry point of your application. This can be changed by creating `bkg.config.json` at the root directory of your project:
+```json
+{
+    "entry": "app.ts"
+}
+```
 
 ## Why?
 - Distribute a single binary that can run without Bun or any external dependencies installed
@@ -83,11 +88,12 @@ chmod +x build.sh && ./build.sh
 - Compiler: Stream archive directly to `lz4_compress_default` instead of through the filesystem
 - Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.
 - :white_check_mark: ~~Use [zfetch](https://github.com/truemedian/zfetch) instead of cURL~~
-- JSON build script, advanced options to include external assets, make compression optional
+- :white_check_mark: ~~JSON configuration file~~
 - :white_check_mark: ~~Pass CLI args to javascript~~
 - :white_check_mark: ~~Named app directory containing the CRC32 hash of project sources. This will fix outdated cached code being executed.~~
 
 **Roadmap:**
+- Prebuild, postbuild options and CLI argument counterparts of `bkg.config.json`
 - Bundle sources (and possibly node_modules) into a single file before packaging
 - Override Bun default variables with an injected JS entry point
 - Bun CLI flags

@@ -5,6 +5,7 @@ const ChildProcess = std.ChildProcess;
 const std = @import("std");
 const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
+const Config = @import("config.zig").Config;
 
 const ParseResult = struct {
     compressed: usize,
@@ -95,16 +96,14 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
             _ = try std.fs.makeDirAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", name}));
         }
         else if(header.type == mtar.MTAR_TREG) {
-            // std.debug.print("Writing file: {s}\n", .{name});
-
             _ = mtar.mtar_find(&tar, name.ptr, header);
             var fileBuf: []u8 = try allocator.alloc(u8, @intCast(usize, header.size));
             _ = mtar.mtar_read_data(&tar, fileBuf.ptr, header.size);
 
             var exfile = try std.fs.createFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", name}), .{});
             _ = try exfile.write(fileBuf);
-            
             exfile.close();
+            
             allocator.free(fileBuf);
         }
 
@@ -120,7 +119,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
 }
 
 // Initiates Bun runtime after extraction
-pub fn execProcess(allocator: std.mem.Allocator, root: []const u8) anyerror!void {
+pub fn execProcess(allocator: std.mem.Allocator, root: []const u8, config: *Config) anyerror!void {
 
     // Give executable permissions to bun
     var file: ?std.fs.File = std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", "bkg_bun"}), .{}) catch |e| switch(e) {
@@ -139,7 +138,7 @@ pub fn execProcess(allocator: std.mem.Allocator, root: []const u8) anyerror!void
     defer cmd_args.deinit();
     try cmd_args.appendSlice(&[_][]const u8{
         try std.mem.concat(allocator, u8, &.{root, "/", "bkg_bun"}),
-        try std.mem.concat(allocator, u8, &.{root, "/", "index.js"})
+        try std.mem.concat(allocator, u8, &.{root, "/", config.entry})
     });
 
     // Add passed commandline arguments

@@ -3,6 +3,7 @@ const std = @import("std");
 const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
 const builtin = @import("builtin");
+const defaultConfig = @import("config.zig").defaultConfig;
 
 // Performs the build process for a given Bun binary, target, project path and output path
 pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const u8, target: []const u8, project: []const u8, out: []const u8) anyerror![]const u8 {
@@ -55,6 +56,9 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
     var walker = try dir.walk(allocator);
     defer walker.deinit();
 
+    // Whether bkg.config.json was found while walking
+    var customConfig = false;
+
     // Add sources to archive
     while (try walker.next()) |entry| {
         // Handle directories
@@ -63,6 +67,9 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
             _ = mtar.mtar_write_dir_header(&tar, (try allocator.dupe(u8, entry.path)).ptr);
             continue;
         }
+
+        // Check if custom config file is present
+        if(std.mem.eql(u8, entry.path, "bkg.config.json")) customConfig = true;
 
         // Read source into buffer
         var file = try std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", entry.path}), .{});
@@ -77,6 +84,13 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
         // Close & free memory for this file
         allocator.free(buf);
         file.close();
+    }
+
+    // If no custom config is present, add default config to archive
+    if(customConfig == false) {
+        std.debug.print("Configuration file not found, using default\n", .{});
+        _ = mtar.mtar_write_file_header(&tar, "bkg.config.json", defaultConfig.len);
+        _ = mtar.mtar_write_data(&tar, defaultConfig.ptr, defaultConfig.len);
     }
     
     // Add Bun binary to archive

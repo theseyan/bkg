@@ -9,6 +9,7 @@
 const std = @import("std");
 const runtime = @import("runtime.zig");
 const knownFolders = @import("known-folders");
+const config = @import("config.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var arena = std.heap.ArenaAllocator.init(gpa.allocator());
@@ -44,7 +45,10 @@ pub fn main() !void {
         try runtime.extractArchive(allocator, selfPath, appDirPath, headers);
     }
 
+    // Load configuration file
+    try config.load(allocator, try std.mem.concat(allocator, u8, &.{appDirPath, "/bkg.config.json"}));
+
     // Execute process
-    try runtime.execProcess(allocator, appDirPath);
+    try runtime.execProcess(allocator, appDirPath, config.get());
 
 }
