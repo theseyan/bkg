@@ -137,6 +137,14 @@ pub fn execProcess(allocator: std.mem.Allocator, root: []const u8) anyerror!void
         try std.mem.concat(allocator, u8, &.{root, "/", "index.js"})
     });
 
+    // Add passed commandline arguments
+    var iterator = try std.process.argsWithAllocator(allocator);
+    defer iterator.deinit();
+    _ = iterator.skip();
+    while(iterator.next()) |arg| {
+        try cmd_args.appendSlice(&[_][]const u8{arg});
+    }
+
     // Initiate child process
     try exec(allocator, "", cmd_args.items);
 

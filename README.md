@@ -81,7 +81,8 @@ chmod +x build.sh && ./build.sh
 
 - Compiler: Stream archive directly to `lz4_compress_default` instead of through the filesystem
 - Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.
-- Pass CLI args to javascript
+- Override Bun default variables with an injected JS entry point
+- :white_check_mark: ~~Pass CLI args to javascript~~
 - Use [uuid](https://github.com/dmgk/zig-uuid) temporary directory naming to prevent possible naming conflicts
 - Bundle sources (and possibly node_modules) into a single file before packaging
 - JSON build script, advanced options to include external assets, make compression optional
