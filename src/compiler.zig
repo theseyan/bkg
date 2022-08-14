@@ -157,8 +157,6 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
         try std.fmt.format(compSizeBufferStream.writer(), "{}", .{compSize});
         try std.fmt.format(hashBufferStream.writer(), "{}", .{hash});
 
-        std.debug.print("writing buffers: {any}\n{any}\n", .{hashBuffer, compSizeBuffer});
-
         _ = try file.write(hashBuffer);
         _ = try file.write(compSizeBuffer);
     }

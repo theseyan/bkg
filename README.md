@@ -79,14 +79,16 @@ chmod +x build.sh && ./build.sh
 
 # Todo
 
+**Release v0.1.0:**
 - Compiler: Stream archive directly to `lz4_compress_default` instead of through the filesystem
 - Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.
-- Override Bun default variables with an injected JS entry point
+- :white_check_mark: ~~Use [zfetch](https://github.com/truemedian/zfetch) instead of cURL~~
+- JSON build script, advanced options to include external assets, make compression optional
 - :white_check_mark: ~~Pass CLI args to javascript~~
 - :white_check_mark: ~~Named app directory containing the CRC32 hash of project sources. This will fix outdated cached code being executed.~~
+
+**Roadmap:**
 - Bundle sources (and possibly node_modules) into a single file before packaging
-- JSON build script, advanced options to include external assets, make compression optional
+- Override Bun default variables with an injected JS entry point
 - Bun CLI flags
-- :white_check_mark: ~~Use [zfetch](https://github.com/truemedian/zfetch) instead of cURL~~
 - Fork a custom build of Bun with only the JS runtime and use that instead of the official binaries
-- If size of `bun` can be brought down under 50 MB, consider executing directly from memory
