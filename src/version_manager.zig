@@ -19,7 +19,7 @@ pub const APIReleaseTag = struct{
 };
 
 // Initialize Version Manager
-// Inits cURL, makes sure .bkg directory exists
+// Inits zfetch, makes sure .bkg directory exists
 pub fn init(allocator: std.mem.Allocator) anyerror!void {
 
     // .bkg directory present in home directory
@@ -285,15 +285,5 @@ pub fn getBunTargetString(target: []const u8) ![]const u8 {
     }else {
         return error.UnknownTarget;
     }
-
-}
-
-// Callback required by cURL to write to a Zig ArrayList
-fn curlWriteToArrayListCallback(data: *anyopaque, size: c_uint, nmemb: c_uint, user_data: *anyopaque) callconv(.C) c_uint {
-
-    var buffer = @intToPtr(*std.ArrayList(u8), @ptrToInt(user_data));
-    var typed_data = @intToPtr([*]u8, @ptrToInt(data));
-    buffer.appendSlice(typed_data[0 .. nmemb * size]) catch return 0;
-    return nmemb * size;
 
 }
