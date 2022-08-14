@@ -83,7 +83,7 @@ chmod +x build.sh && ./build.sh
 - Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.
 - Override Bun default variables with an injected JS entry point
 - :white_check_mark: ~~Pass CLI args to javascript~~
-- Named app directory containing the CRC32 hash of project sources. This will fix outdated cached code being executed.
+- :white_check_mark: ~~Named app directory containing the CRC32 hash of project sources. This will fix outdated cached code being executed.~~
 - Bundle sources (and possibly node_modules) into a single file before packaging
 - JSON build script, advanced options to include external assets, make compression optional
 - Bun CLI flags

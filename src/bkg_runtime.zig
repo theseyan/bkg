@@ -24,9 +24,15 @@ pub fn main() !void {
     selfPath = try std.fs.selfExePath(selfPath);
     var basename = std.fs.path.basename(selfPath);
 
+    // Parse executable headers
+    const headers = try runtime.parseBinary(allocator, selfPath);
+
     // We run the app in /tmp directory
     var runtimeDir = "/tmp";
-    var appDirPath = try std.mem.concat(allocator, u8, &.{runtimeDir, "/.", basename, "_runtime"});
+
+    // App directory is formatted as: .{basename}_runtime_{hash}
+    // where hash is the CRC32 hash of LZ4 compressed sources buffer
+    var appDirPath = try std.mem.concat(allocator, u8, &.{runtimeDir, "/.", basename, "_runtime_", headers.hash});
 
     var appDir: ?void = std.fs.makeDirAbsolute(appDirPath) catch |e| switch(e) {
         error.PathAlreadyExists => null,
@@ -35,7 +41,7 @@ pub fn main() !void {
 
     if(appDir != null) {
         // Directory was created
-        try runtime.extractArchive(allocator, selfPath, appDirPath);
+        try runtime.extractArchive(allocator, selfPath, appDirPath, headers);
     }
 
     // Execute process

@@ -6,27 +6,41 @@ const std = @import("std");
 const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
 
-// Parses a bkg binary to get the compressed size header
-pub fn getCompressedSize(allocator: std.mem.Allocator, path: []const u8) anyerror!usize {
+const ParseResult = struct {
+    compressed: usize,
+    hash: []const u8
+};
+
+// Parses a bkg binary to get the compressed size header and CRC32 hash
+pub fn parseBinary(allocator: std.mem.Allocator, path: []const u8) anyerror!ParseResult {
 
     var file = try std.fs.openFileAbsolute(path, .{});
     defer file.close();
 
-    // Seek to 10 bytes before the end
+    // Seek to 20 bytes before the end
     var stat = try file.stat();
-    try file.seekTo(stat.size - 10);
+    try file.seekTo(stat.size - 20);
     
-    // Read 10 bytes
-    const buf: []u8 = try file.readToEndAlloc(allocator, 1024);
+    // Read 20 bytes
+    const buf: []const u8 = try file.readToEndAlloc(allocator, 1024);
     defer allocator.free(buf);
 
+    var crcBuf = buf[0..10];
+    var compSizeBuf = buf[10..20];
+
     // Parse into usize
-    var nullIndex = std.mem.indexOfScalar(u8, buf, 0) orelse 10;   
-    var compSize = std.fmt.parseInt(usize, buf[0..nullIndex], 0) catch {
-        return 0;
+    var nullIndex = std.mem.indexOfScalar(u8, compSizeBuf, 0) orelse 10;
+    var crcNullIndex = std.mem.indexOfScalar(u8, crcBuf, 0) orelse 10;
+
+    //var crc32 = try allocator.dupe(u8, crcBuf);
+    var compSize = std.fmt.parseInt(usize, compSizeBuf[0..nullIndex], 0) catch {
+        return error.FailedParseCompressedSize;
     };
 
-    return compSize;
+    return ParseResult{
+        .compressed = compSize,
+        .hash = try allocator.dupe(u8, crcBuf[0..crcNullIndex])
+    };
 
 }
 
@@ -34,15 +48,7 @@ pub fn getCompressedSize(allocator: std.mem.Allocator, path: []const u8) anyerro
 // and then de-archives it to a temporary location in the filesystem
 // We prefer OS temp directory because it's always world writeable.
 // However, this may change.
-pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []const u8) anyerror!void {
-
-    // Get number of compressed bytes
-    var compSize = try getCompressedSize(allocator, target);
-
-    // Check if executable is not packaged
-    if(compSize == 0) {
-        @panic("Runtime does not contain a package.");
-    }
+pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []const u8, parsed: ParseResult) anyerror!void {
 
     // Open binary
     var file = try std.fs.openFileAbsolute(target, .{});
@@ -50,7 +56,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
 
     // Seek to start of compressed archive
     var stat = try file.stat();
-    try file.seekTo(stat.size - compSize - 10); // 10 bytes for header
+    try file.seekTo(stat.size - parsed.compressed - 20); // 20 bytes for header
 
     // Compressed archive can be upto 256MB
     const buf: []u8 = try file.readToEndAlloc(allocator, 256 * 1024 * 1024);
@@ -60,13 +66,12 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     var decompressed: []u8 = try allocator.alloc(u8, 512 * 1024 * 1024);
     
     // Perform LZ4 decompression
-    var result = lz4.LZ4_decompress_safe(buf[0..compSize].ptr, decompressed.ptr, @intCast(c_int, compSize), 512 * 1024 * 1024);
-    _ = allocator.resize(decompressed, @intCast(usize, result)); // Resize to decompressed size
+    var result = lz4.LZ4_decompress_safe(buf[0..parsed.compressed].ptr, decompressed.ptr, @intCast(c_int, parsed.compressed), 512 * 1024 * 1024);
 
     // Write buffer to disk
     const bkg_extracted = "bkg_extracted";
     var decompFile = try std.fs.cwd().createFile(bkg_extracted, .{});
-    var decompBytes = try decompFile.write(decompressed);
+    var decompBytes = try decompFile.write(decompressed[0..@intCast(usize, result)]);
     _ = decompBytes;
 
     // Free decompressed buffer

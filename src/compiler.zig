@@ -122,6 +122,15 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
 
     std.debug.print("Compressed to {} bytes\n", .{compSize});
 
+    // Calculate CRC32 Hash from the LZ4 compressed buffer
+    // This is added to the binary and prevents outdated cached code from
+    // stopping an updated executable extracting new code.
+    var hashFunc = std.hash.Crc32.init();
+    hashFunc.update(compressed[0..@intCast(usize, compSize)]);
+    var hash = hashFunc.final();
+
+    std.debug.print("Calculated CRC32 hash: {any}\n", .{hash});
+
     var file = try std.fs.openFileAbsolute(target, .{.mode = .read_write});
     defer file.close();
 
@@ -135,14 +144,22 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
     var written = try file.write(compressed[0..@intCast(usize, compSize)]);
     std.debug.print("Written {} bytes to binary\n", .{written});
 
-    // Write compressed size at the end (10 bytes)
+    // Write CRC32 hash + compressed size (10 + 10) bytes at the end
     {
         std.debug.print("Finalizing binary...\n", .{});
         var compSizeBuffer: []u8 = try allocator.alloc(u8, 10);
+        var hashBuffer: []u8 = try allocator.alloc(u8, 10);
         defer allocator.free(compSizeBuffer);
-        var compSizeBufferStream = std.io.fixedBufferStream(compSizeBuffer);
-        try std.fmt.format(compSizeBufferStream.writer(), "{}", .{compSize});
+        defer allocator.free(hashBuffer);
 
+        var compSizeBufferStream = std.io.fixedBufferStream(compSizeBuffer);
+        var hashBufferStream = std.io.fixedBufferStream(hashBuffer);
+        try std.fmt.format(compSizeBufferStream.writer(), "{}", .{compSize});
+        try std.fmt.format(hashBufferStream.writer(), "{}", .{hash});
+
+        std.debug.print("writing buffers: {any}\n{any}\n", .{hashBuffer, compSizeBuffer});
+
+        _ = try file.write(hashBuffer);
         _ = try file.write(compSizeBuffer);
     }
     std.debug.print("Done\n", .{});
