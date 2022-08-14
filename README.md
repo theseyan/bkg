@@ -25,6 +25,7 @@ Run `bkg --help` to get a list of options on usage:
 
 ```console
 Usage: bkg [options] <ProjectDirectory>
+Example: bkg myProject -o myapp
 
 Options:
   -h, --help             Display this help message.
