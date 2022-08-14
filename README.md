@@ -14,7 +14,12 @@ bkg is a CLI tool that can generate self-sufficient binaries from your Bun code 
 
 ## Usage
 
-Get the [latest release](https://github.com/theseyan/bkg/releases) for your platform (`bkg_runtime-` binaries are not required, they will be automatically downloaded).
+Fastest way to install:
+```
+wget https://github.com/theseyan/bkg/raw/main/install.sh && chmod +x install.sh && sudo ./install.sh
+```
+
+OR, get the [latest release](https://github.com/theseyan/bkg/releases) for your platform (`bkg_runtime-` binaries are not required, they will be automatically downloaded).
 
 Run `bkg --help` to get a list of options on usage:
 
