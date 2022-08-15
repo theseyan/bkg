@@ -69,22 +69,14 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     // Perform LZ4 decompression
     var result = lz4.LZ4_decompress_safe(buf[0..parsed.compressed].ptr, decompressed.ptr, @intCast(c_int, parsed.compressed), 512 * 1024 * 1024);
 
-    // Write buffer to disk
-    const bkg_extracted = "bkg_extracted";
-    var decompFile = try std.fs.cwd().createFile(bkg_extracted, .{});
-    var decompBytes = try decompFile.write(decompressed[0..@intCast(usize, result)]);
-    _ = decompBytes;
-
-    // Free decompressed buffer
-    allocator.free(decompressed);
-
     // Open decompressed archive
-    var tar: mtar.mtar_t = undefined;
+    var tar: mtar.mtar_t = std.mem.zeroes(mtar.mtar_t);
     var header: *mtar.mtar_header_t = try allocator.create(mtar.mtar_header_t);
-    _ = mtar.mtar_open(&tar, bkg_extracted, "r");
+    _ = root;
+    _ = mtar_open_mem(&tar, &decompressed[0..@intCast(usize, result)]);
 
     // std.debug.print("Reading archive...\n", .{});
-    
+
     // Iterate through the archive
     while (mtar.mtar_read_header(&tar, header) != mtar.MTAR_ENULLRECORD) {
         var nullIndex = std.mem.indexOfScalar(u8, &header.name, 0) orelse header.name.len;
@@ -92,7 +84,6 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
 
         // Create directory
         if(header.type == mtar.MTAR_TDIR) {
-            // std.debug.print("Creating directory: {s}\n", .{name});
             _ = try std.fs.makeDirAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", name}));
         }
         else if(header.type == mtar.MTAR_TREG) {
@@ -113,8 +104,8 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     // Close the archive
     _ = mtar.mtar_close(&tar);
 
-    // Delete temporary archive
-    try std.fs.cwd().deleteFile(bkg_extracted);
+    // Free decompressed buffer
+    allocator.free(decompressed);
 
 }
 
@@ -183,53 +174,52 @@ pub fn exec(a: std.mem.Allocator, cwd: []const u8, argv: []const []const u8) !vo
 
 }
 
-// TODO: Stream LZ4 decompressed buffer directly to mtar in memory
-// This will improve startup time by a lot
+// Callback functions required by microtar
+// Streams decompressed LZ4 buffer directly to mtar in memory
 
-// Called by microtar
-// tar.* = mtar.mtar_t{
-//         .stream = &decompressed,
-//         .read = extractReadCallback,
-//         .seek = extractSeekCallback,
-//         .close = extractCloseCallback,
-//         .pos = 0,
-//         .last_header = 0,
-//         .remaining_data = 0,
-//         .write = null
-//     };
-// pub fn extractReadCallback(tar: ?*mtar.mtar_t, data: ?*anyopaque, size: c_uint) callconv(.C) c_int {
-//     _ = tar;
-//     _ = data;
-//     _ = size;
+fn mtar_mem_write(tar: [*c]mtar.mtar_t, data: ?*const anyopaque, size: c_uint) callconv(.C) c_int {
+    _ = tar;
+    _ = data;
+    _ = size;
+    return mtar.MTAR_EWRITEFAIL;
+}
 
-//     var dataPtr = data orelse @panic("Null pointer passed to read callback");
-//     var buffer: *[]u8 = @ptrCast(*[]u8, @alignCast(@alignOf([]u8), dataPtr));
+// mem_read should supply data to microtar
+fn mtar_mem_read(tar: ?*mtar.mtar_t, data: ?*anyopaque, size: c_uint) callconv(.C) c_int {
 
-//     var tarPtr = tar orelse @panic("Null pointer passed to read callback");
-//     var streamPtr = tarPtr.*.stream orelse @panic("Null pointer");
-//     var streamBuffer: *[]u8 = @ptrCast(*[]u8, @alignCast(@alignOf([]u8), streamPtr));
+    const dataPtr = data orelse @panic("Null pointer passed to mtar mem_read");
+    const buffer = @ptrCast([*]u8, dataPtr);
 
-//     var reader = std.io.fixedBufferStream(streamBuffer.*);
-//     var read = try reader.read(buffer.*);
+    const streamPtr = tar.?.stream;
+    const streamBuffer: *[]u8 = @ptrCast(*[]u8, @alignCast(@alignOf([]u8), streamPtr));
 
-//     std.debug.print("buf size: {}, size: {}, pos: {}, read {} bytes\n", .{buffer.len, size, tarPtr.*.pos, read});
+    @memcpy(buffer, streamBuffer.*[tar.?.pos..streamBuffer.len].ptr, size);
+    //std.mem.copy(u8, buffer[0..size], streamBuffer.*[tar.?.pos..streamBuffer.len]);
 
-//     return mtar.MTAR_ESUCCESS;
-// }
+    return mtar.MTAR_ESUCCESS;
 
-// pub fn extractSeekCallback(tar: ?*mtar.mtar_t, pos: c_uint) callconv(.C) c_int {
-//     _ = tar;
-//     _ = pos;
+}
 
-//     std.debug.print("seek called {}\n", .{pos});
+fn mtar_mem_seek(tar: ?*mtar.mtar_t, offset: c_uint) callconv(.C) c_int {
+    _ = tar;
+    _ = offset;
+    return mtar.MTAR_ESUCCESS;
+}
 
-//     return mtar.MTAR_ESUCCESS;
-// }
+fn mtar_mem_close(tar: ?*mtar.mtar_t) callconv(.C) c_int {
+    _ = tar;
+    return mtar.MTAR_ESUCCESS;
+}
 
-// pub fn extractCloseCallback(tar: ?*mtar.mtar_t) callconv(.C) c_int {
-//     _ = tar;
+fn mtar_open_mem(tar: *mtar.mtar_t, data: *[]u8) c_int {
 
-//     std.debug.print("close called\n", .{});
+    tar.write = mtar_mem_write;
+    tar.read = mtar_mem_read;
+    tar.seek = mtar_mem_seek;
+    tar.close = mtar_mem_close;
+    tar.stream = data;
 
-//     return mtar.MTAR_ESUCCESS;
-// }
+    // Return ok
+    return mtar.MTAR_ESUCCESS;
+
+}

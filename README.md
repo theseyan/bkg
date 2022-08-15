@@ -91,8 +91,8 @@ chmod +x build.sh && ./build.sh
 # Todo
 
 **Release v0.1.0:**
+- :white_check_mark: ~~Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.~~
 - Compiler: Stream archive directly to `lz4_compress_default` instead of through the filesystem
-- Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.
 - :white_check_mark: ~~Use [zfetch](https://github.com/truemedian/zfetch) instead of cURL~~
 - :white_check_mark: ~~JSON configuration file~~
 - :white_check_mark: ~~Pass CLI args to javascript~~
