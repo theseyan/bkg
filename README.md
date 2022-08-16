@@ -16,7 +16,7 @@ bkg is a CLI tool that can generate self-sufficient binaries from your Bun code 
 
 Fastest way to install:
 ```
-wget https://github.com/theseyan/bkg/raw/main/install.sh && chmod +x install.sh && sudo ./install.sh
+curl -fsSL https://github.com/theseyan/bkg/raw/main/install.sh | sudo sh
 ```
 
 OR, get the [latest release](https://github.com/theseyan/bkg/releases) for your platform (`bkg_runtime-` binaries are not required, they will be automatically downloaded).
@@ -47,7 +47,7 @@ bkg assumes `index.js` to be the entry point of your application. This can be ch
 ## Why?
 - Distribute a single binary that can run without Bun or any external dependencies installed
 - Build executables for any platform supported by Bun
-- Around 1/2 the size of Bun runtime
+- Around 1/2 the size of Bun runtime and 1/3 the size of Deno executables!
 - Package any asset into the binary, not just scripts and modules
 - No performance regression except for the first startup
 - Although not yet possible, the goal is generating bytecode and the ability to distribute binaries stripped of sources
