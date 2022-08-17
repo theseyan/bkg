@@ -47,7 +47,7 @@ bkg assumes `index.js` to be the entry point of your application. This can be ch
 ## Why?
 - Distribute a single binary that can run without Bun or any external dependencies installed
 - Build executables for any platform supported by Bun
-- Around 1/2 the size of Bun runtime and 1/3 the size of Deno executables!
+- Around 1/2 the size of Bun runtime
 - Package any asset into the binary, not just scripts and modules
 - No performance regression except for the first startup
 - Although not yet possible, the goal is generating bytecode and the ability to distribute binaries stripped of sources
@@ -57,7 +57,7 @@ bkg assumes `index.js` to be the entry point of your application. This can be ch
 bkg and pkg (Node) have a number of differences arising either from a design decision or a Bun limitation:
 - **Sources are not compiled to bytecode:** Bun does not expose a JavascriptCore equivalent of `v8::ScriptCompiler` yet, hence sources are kept intact in the compiled executable.
 - **File system:** bkg does not embed a virtual filesystem but instead archives sources using the very fast [LZ4 compression](https://github.com/lz4/lz4) which are decompressed to a temporary location at runtime. This makes the resulting binary about 1/2 the size of Bun itself, while not having to keep the entire runtime in memory.
-- **Import resolution:** Unlike pkg, we do not recursively traverse through each import in the sources and package those files (yet). bkg will simply archive the entire source folder - this may change if Bun can bundle dependencies and sources into one file.
+- **Import resolution:** Unlike pkg, we do not recursively traverse through each import in the sources and package those files (yet). bkg will simply archive the entire source folder - this will change in version 1.0.
 
 ## Key takeaways
 
@@ -100,7 +100,8 @@ chmod +x build.sh && ./build.sh
 - :white_check_mark: ~~Named app directory containing the CRC32 hash of project sources. This will fix outdated cached code being executed.~~
 - Override Bun default variables with an injected JS entry point
 
-**Roadmap:**
+**Roadmap: v1.0**
+- Optimizer/Bundler based on Rollup.js to bundle entire source tree into a handful of JS files. This is important because currently our biggest bottleneck is decompression speed with lots of files (>1000 files) which is common in projects with `node_modules`. Ideally, this will be replaced by Bun's own bundler.
 - Prebuild, postbuild options and CLI argument counterparts of `bkg.config.json`
 - Bundle sources (and possibly node_modules) into a single file before packaging
 - Bun CLI flags
