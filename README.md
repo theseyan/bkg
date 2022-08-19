@@ -101,8 +101,14 @@ chmod +x build.sh && ./build.sh
 - Override Bun default variables with an injected JS entry point
 
 **Roadmap: v1.0**
-- Optimizer/Bundler based on Rollup.js to bundle entire source tree into a handful of JS files. This is important because currently our biggest bottleneck is decompression speed with lots of files (>1000 files) which is common in projects with `node_modules`. Ideally, this will be replaced by Bun's own bundler.
+- Optimizer/Bundler based on [esbuild](https://esbuild.github.io/) to bundle entire source tree into a handful of JS files. This is important because currently our biggest bottleneck is decompression speed with lots of files (>1000 files) which is common in projects with `node_modules`. Ideally, this will be replaced by Bun's own bundler.
+- Runtime hash checking against inflated sources to prevent execution of modified scripts
+- Prettier CLI output with colors & loaders
 - Prebuild, postbuild options and CLI argument counterparts of `bkg.config.json`
-- Bundle sources (and possibly node_modules) into a single file before packaging
-- Bun CLI flags
-- Fork a custom build of Bun with only the JS runtime and use that instead of the official binaries
+- Pass Bun CLI flags
+- Fork a custom build of Bun with only the JS runtime to further reduce binary size
+
+**Optimizer Progress:**
+- [x] Bundle vanilla TS/JS/JSON sources to ES modules
+- [ ] Handle native modules and placement of `.node` binaries through `require` and `import` calls
+- [ ] Handle shared libraries (`.so`, `.dylib`, etc.) through bun:ffi's `dlopen`
