@@ -1,6 +1,6 @@
 // Archives source files into TAR and compresses with LZ4
 const std = @import("std");
-const lz4 = @import("translated/liblz4.zig");
+const lz4 = @import("translated/lz4hc.zig");
 const mtar = @import("translated/libmicrotar.zig");
 const builtin = @import("builtin");
 const defaultConfig = @import("config.zig").defaultConfig;
@@ -131,8 +131,8 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
     var compressed: []u8 = try allocator.alloc(u8, 1024 * 1024 * 256);
     defer allocator.free(compressed);
 
-    // Perform LZ4 compression
-    var compSize = lz4.LZ4_compress_default(buf.ptr, compressed.ptr, @intCast(c_int, buf.len), 1024 * 1024 * 256);
+    // Perform LZ4 HC compression with compression level 12 (max)
+    var compSize = lz4.LZ4_compress_HC(buf.ptr, compressed.ptr, @intCast(c_int, buf.len), 1024 * 1024 * 256, @intCast(c_int, 12));
 
     std.debug.print("Compressed to {} bytes\n", .{compSize});
 

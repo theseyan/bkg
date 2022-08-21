@@ -37,7 +37,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         return err;
     };
     defer res.deinit();
-
+    
     // <ProjectDirectory> is provided
     if(res.positionals.len > 0) {
 

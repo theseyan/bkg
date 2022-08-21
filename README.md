@@ -47,7 +47,7 @@ bkg assumes `index.js` to be the entry point of your application. This can be ch
 ## Why?
 - Distribute a single binary that can run without Bun or any external dependencies installed
 - Build executables for any platform supported by Bun
-- Around 1/2 the size of Bun runtime
+- Around 1/2 the size of Bun runtime 
 - Package any asset into the binary, not just scripts and modules
 - No performance regression except for the first startup
 - Although not yet possible, the goal is generating bytecode and the ability to distribute binaries stripped of sources
@@ -63,7 +63,7 @@ bkg and pkg (Node) have a number of differences arising either from a design dec
 
 - bkg is **not** meant for very dynamic environments (for eg. serverless), as it adds considerable overhead to startup time. However, this overhead is only valid for the first start as the decompressed sources are cached in the filesystem onwards.
 - It is not recommended to perform `fs` operations with relative paths, as there is no guarantee where the sources may be placed at runtime. This will be fixed when I complete overriding some of `fs` default paths.
-- Generated executables must not be stripped or the embedded code sources get corrupted.
+- Generated executables are already stripped and must not be stripped again.
 
 # Building from source
 bkg is written in Zig and compilation is fairly straightforward. The prerequisites are:
@@ -77,8 +77,8 @@ git submodule update --init --recursive
 # Build for x86_64-linux
 zig build -Drelease-fast -Dtarget=x86_64-linux
 
-# [Optional] Build runtime for x86_64-linux
-zig build-exe -target x86_64-linux src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
+# [Optional] Build runtime for x86_64-linux & strip it
+zig build-exe -target x86_64-linux src/bkg_runtime.zig --strip -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
 
 # Run bkg
 ./zig-out/bin/bkg --help
@@ -91,7 +91,7 @@ chmod +x build.sh && ./build.sh
 # Todo
 
 **Release v0.1.0:**
-- Switch to LZ4 high compression variant that compresses more but doesn't affect decompression speed (and shaves off 7MB!)
+- :white_check_mark: ~~Switch to LZ4 high compression variant that compresses more but doesn't affect decompression speed (and shaves off 7MB!)~~
 - :white_check_mark: ~~Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.~~
 - Compiler: Stream archive directly to `LZ4_compress_HC` instead of through the filesystem
 - :white_check_mark: ~~Use [zfetch](https://github.com/truemedian/zfetch) instead of cURL~~
@@ -109,6 +109,4 @@ chmod +x build.sh && ./build.sh
 - Fork a custom build of Bun with only the JS runtime to further reduce binary size
 
 **Optimizer Progress:**
-- [x] Bundle vanilla TS/JS/JSON sources to ES modules
-- [ ] Handle native modules and placement of `.node` binaries through `require` and `import` calls
-- [ ] Handle shared libraries (`.so`, `.dylib`, etc.) through bun:ffi's `dlopen`
+See [bOptimizer](https://github.com/theseyan/boptimizer).

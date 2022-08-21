@@ -59,15 +59,15 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     var stat = try file.stat();
     try file.seekTo(stat.size - parsed.compressed - 20); // 20 bytes for header
 
-    // Compressed archive can be upto 256MB
-    const buf: []u8 = try file.readToEndAlloc(allocator, 256 * 1024 * 1024);
+    // Compressed archive can be upto 512MB
+    const buf: []u8 = try file.readToEndAlloc(allocator, 512 * 1024 * 1024);
     defer allocator.free(buf);
 
-    // Decompressed archive can be upto 512MB
-    var decompressed: []u8 = try allocator.alloc(u8, 512 * 1024 * 1024);
+    // Decompressed archive can be upto 1024MB
+    var decompressed: []u8 = try allocator.alloc(u8, 1024 * 1024 * 1024);
     
     // Perform LZ4 decompression
-    var result = lz4.LZ4_decompress_safe(buf[0..parsed.compressed].ptr, decompressed.ptr, @intCast(c_int, parsed.compressed), 512 * 1024 * 1024);
+    var result = lz4.LZ4_decompress_safe(buf[0..parsed.compressed].ptr, decompressed.ptr, @intCast(c_int, parsed.compressed), 1024 * 1024 * 1024);
 
     // Open decompressed archive
     var tar: mtar.mtar_t = std.mem.zeroes(mtar.mtar_t);
@@ -187,7 +187,8 @@ fn mtar_mem_write(tar: [*c]mtar.mtar_t, data: ?*const anyopaque, size: c_uint) c
 // mem_read should supply data to microtar
 fn mtar_mem_read(tar: ?*mtar.mtar_t, data: ?*anyopaque, size: c_uint) callconv(.C) c_int {
 
-    const dataPtr = data orelse @panic("Null pointer passed to mtar mem_read");
+    // TODO: Return error on null pointer?
+    const dataPtr = data orelse return mtar.MTAR_ENULLRECORD;
     const buffer = @ptrCast([*]u8, dataPtr);
 
     const streamPtr = tar.?.stream;

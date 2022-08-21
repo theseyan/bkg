@@ -6,10 +6,15 @@ pub fn build(b: *std.build.Builder) !void {
     const mode = b.standardReleaseOptions();
     const exe = b.addExecutable("bkg", "src/main.zig");
 
+    // Strip debug symbols by default
+    // Should be disabled during development/debugging
+    exe.strip = true;
+
     exe.linkLibC();
 
     // Compile LZ4 library
     exe.addCSourceFile("deps/lz4/lib/lz4.c", &.{});
+    exe.addCSourceFile("deps/lz4/lib/lz4hc.c", &.{});
 
     // Compile microtar library
     exe.addCSourceFile("deps/microtar/src/microtar.c", &.{});

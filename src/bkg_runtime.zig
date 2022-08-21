@@ -1,10 +1,8 @@
 // This program is compiled separately as the runtime for packaging
 // It should only deal with running the packaged app
 
-// To build the runtime
-// zig build-exe -Drelease-fast src/bkg_runtime.zig -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
-// Strip debug symbols:
-// strip bkg_runtime
+// To build the runtime & strip debug symbols:
+// zig build-exe -Drelease-fast src/bkg_runtime.zig --strip -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
 
 const std = @import("std");
 const runtime = @import("runtime.zig");
