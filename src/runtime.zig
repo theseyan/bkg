@@ -196,7 +196,7 @@ fn mtar_mem_read(tar: ?*mtar.mtar_t, data: ?*anyopaque, size: c_uint) callconv(.
 
     @memcpy(buffer, streamBuffer.*[tar.?.pos..streamBuffer.len].ptr, size);
     //std.mem.copy(u8, buffer[0..size], streamBuffer.*[tar.?.pos..streamBuffer.len]);
-
+    
     return mtar.MTAR_ESUCCESS;
 
 }

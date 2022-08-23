@@ -107,6 +107,7 @@ chmod +x build.sh && ./build.sh
 - Prebuild, postbuild options and CLI argument counterparts of `bkg.config.json`
 - Pass Bun CLI flags
 - Fork a custom build of Bun with only the JS runtime to further reduce binary size
+- Multithreaded decompression for even faster cold starts
 
 **Optimizer Progress:**
 See [bOptimizer](https://github.com/theseyan/boptimizer).

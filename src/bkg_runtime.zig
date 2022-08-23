@@ -9,8 +9,7 @@ const runtime = @import("runtime.zig");
 const knownFolders = @import("known-folders");
 const config = @import("config.zig");
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
 var allocator = arena.allocator();
 
 pub fn main() !void {
