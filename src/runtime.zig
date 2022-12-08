@@ -19,7 +19,6 @@ var alloc: std.mem.Allocator = undefined;
 var extractRoot: []const u8 = undefined;
 var m1 = std.Thread.Mutex{};
 var m2 = std.Thread.Mutex{};
-var m3 = std.Thread.Mutex{};
 var startTime: i64 = undefined;
 var numTasks: usize = undefined;
 
@@ -93,10 +92,10 @@ fn extractCallback(op: *threadpool.Task) void {
     // We must lock to prevent race conditions and other weird errors
     // due to massive concurrency
     {
-        m3.lock();
+        m2.lock();
         op.data.index.* += 1;
         if(op.data.index.* == numTasks) pool.shutdown();
-        m3.unlock();
+        m2.unlock();
     }
 
 }
@@ -375,8 +374,6 @@ fn mtar_mem_read(tar: ?*mtar.mtar_t, data: ?*anyopaque, size: c_uint) callconv(.
     const dataPtr = data orelse return mtar.MTAR_ENULLRECORD;
     const thisTar = tar orelse return mtar.MTAR_EFAILURE;
 
-    //m2.lock();
-
     const buffer = @ptrCast([*]u8, @alignCast(@alignOf(u8), dataPtr));
     const streamPtr = thisTar.stream orelse return mtar.MTAR_ENULLRECORD;
     const streamBuffer: *[]u8 = @ptrCast(*[]u8, @alignCast(@alignOf(*[]u8), streamPtr));
@@ -385,8 +382,6 @@ fn mtar_mem_read(tar: ?*mtar.mtar_t, data: ?*anyopaque, size: c_uint) callconv(.
     for (streamBuffer.*[thisTar.pos..end]) |b, i| buffer[i] = b;
     //@memcpy(buffer, streamBuffer.*[thisTar.pos..streamBuffer.*.len].ptr, size);
     //std.mem.copy(u8, buffer.*, streamBuffer.*[tar.?.pos..streamBuffer.len]);
-
-    //m2.unlock();
     
     return mtar.MTAR_ESUCCESS;
 
