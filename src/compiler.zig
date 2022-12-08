@@ -8,6 +8,16 @@ const defaultConfig = @import("config.zig").defaultConfig;
 // Performs the build process for a given Bun binary, target, project path and output path
 pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const u8, target: []const u8, project: []const u8, out: []const u8) anyerror![]const u8 {
 
+    // Make sure outfile path is not an existing directory
+    var isDir = std.fs.openDirAbsolute(out, .{}) catch |e| switch(e) {
+        else => null
+    };
+    if(isDir != null) {
+        std.debug.print("Output path `{s}` is an existing directory. Please use a different name for the binary.\n", .{out});
+        isDir.?.close();
+        return error.PathIsDirectory;
+    }
+
     // Build archive
     try buildArchive(allocator, bunPath, project);
 
@@ -30,8 +40,6 @@ pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const
     }else {
         std.debug.print("Could not mark binary as executable. Run `chmod +x {s}` to do it manually.\n", .{std.fs.path.basename(out)});
     }
-
-    //std.debug.print("Run `chmod +x {s}` to make binary executable.\n", .{std.fs.path.basename(out)});
 
     _ = target;
     return out;
@@ -122,13 +130,13 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
     std.debug.print("Compressing archive...\n", .{});
 
     // Open archive and read it's contents
-    var archive = try std.fs.cwd().openFile("/tmp/__bkg_build.tar", .{});
-    defer archive.close();
+    var archive = try std.fs.openFileAbsolute("/tmp/__bkg_build.tar", .{});
     const buf: []u8 = try archive.readToEndAlloc(allocator, 1024 * 1024 * 1024); // We assume the archive is < 1 GiB
     defer allocator.free(buf);
 
     // Delete temporary archive file
-    try std.fs.cwd().deleteFile("/tmp/__bkg_build.tar");
+    archive.close();
+    try std.fs.deleteFileAbsolute("/tmp/__bkg_build.tar");
 
     // Allocate 256 MiB buffer for storing compressed archive
     var compressed: []u8 = try allocator.alloc(u8, 1024 * 1024 * 256);
