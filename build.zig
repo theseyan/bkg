@@ -10,6 +10,9 @@ pub fn build(b: *std.build.Builder) !void {
     // Should be disabled during development/debugging
     exe.strip = true;
 
+    // Force stage1 compiler
+    //exe.use_stage1 = true;
+
     exe.linkLibC();
 
     // Compile LZ4 library

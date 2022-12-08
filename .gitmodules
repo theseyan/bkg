@@ -4,15 +4,15 @@
 [submodule "deps/microtar"]
 	path = deps/microtar
 	url = https://github.com/rxi/microtar
-[submodule "deps/zig-clap"]
-	path = deps/zig-clap
-	url = https://github.com/Hejsil/zig-clap
 [submodule "deps/known-folders"]
 	path = deps/known-folders
 	url = https://github.com/ziglibs/known-folders
 [submodule "deps/zip"]
 	path = deps/zip
 	url = https://github.com/kuba--/zip
+[submodule "deps/zig-clap"]
+	path = deps/zig-clap
+	url = https://github.com/Hejsil/zig-clap
 [submodule "deps/zfetch"]
 	path = deps/zfetch
 	url = https://github.com/truemedian/zfetch

@@ -7,7 +7,7 @@ var arena = std.heap.ArenaAllocator.init(gpa.allocator());
 var allocator = arena.allocator();
 
 pub fn main() anyerror!void {
-    
+
     // Free all memory for the program when main exits
     defer arena.deinit();
 

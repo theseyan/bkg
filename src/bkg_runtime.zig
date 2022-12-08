@@ -9,6 +9,10 @@ const runtime = @import("runtime.zig");
 const knownFolders = @import("known-folders");
 const config = @import("config.zig");
 
+// Using evented IO causes a bug in the Zig compiler
+// https://github.com/ziglang/zig/issues/11985
+// pub const io_mode = .evented;
+
 var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
 var allocator = arena.allocator();
 

@@ -189,8 +189,6 @@ pub fn downloadBun(version: []const u8, arch: []const u8) anyerror![]const u8 {
     std.debug.print("Downloaded {any} bytes to disk\n", .{written});
     std.debug.print("Extracting to {s}...\n", .{extractDir});
 
-    _ = runtimeDir;
-
     // Extract the zip archive
     var arg: c_int = 2;
     _ = zip.zip_extract(bunZipPath.ptr, extractDir.ptr, zip_extract_entry, &arg);
