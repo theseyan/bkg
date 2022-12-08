@@ -20,9 +20,10 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         \\  -h, --help             Display this help message.
         \\  -o, --output <str>     Output file name
         \\  -t, --target <str>     Target architecture to build for (default is Host)
+        \\  -b, --baseline         Use non-AVX2 (baseline) build of Bun for compatibility
         \\  --targets              Display list of supported targets
-        \\  --runtime <str>        Path to custom Bun binary (not recommended)
         \\  -v, --version          Display bkg version.
+        \\  --runtime <str>        Path to custom Bun binary (not recommended)
         \\  <str>...
         \\
     ;
@@ -52,6 +53,9 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         // Absolute output path of the resulting executable
         var output: []const u8 = undefined;
 
+        // Whether to use a baseline build of Bun
+        var baseline: ?[]const u8 = if (res.args.baseline) "baseline" else null;
+
         // TODO: Ability to use custom Bun binary
         if(res.args.runtime != null) {
             debug.print("Custom bun binary is not supported in this version, prebuilt will be used.\n", .{});
@@ -65,6 +69,8 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
             target = try compiler.getHostTargetString(allocator);
             debug.print("No target was specified, building for {s}\n", .{target});
         }
+
+        if (res.args.baseline) debug.print("Using non-AVX2 (baseline) build of Bun...\n", .{});
 
         // Get output path
         if(res.args.output != null) {
@@ -82,7 +88,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         defer versionManager.deinit();
 
         // Make sure we have the latest Bun and bkg runtime for the target
-        var runtimePath = try versionManager.downloadBun(try versionManager.getLatestBunVersion(), target);
+        var runtimePath = try versionManager.downloadBun(try versionManager.getLatestBunVersion(), target, baseline);
         var bkgRuntimePath = try versionManager.downloadRuntime(try versionManager.getLatestBkgVersion(), target);
 
         // Build the executable

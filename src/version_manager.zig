@@ -149,12 +149,12 @@ pub fn getLatestBunVersion() anyerror![]const u8 {
 // Downloads Bun binary for a given version and platform
 // Returns immediately if the binary already exists
 // example: bun-v0.1.8, aarch64-linux
-pub fn downloadBun(version: []const u8, arch: []const u8) anyerror![]const u8 {
+pub fn downloadBun(version: []const u8, arch: []const u8, specifier: ?[]const u8) anyerror![]const u8 {
 
     std.debug.print("Downloading {s} for target {s}...\n", .{version, arch});
 
     // Construct URL to bun release
-    const postfix = try getBunTargetString(arch);
+    const postfix = if(specifier == null) try getBunTargetString(arch) else try std.mem.concat(vmAllocator.*, u8, &.{try getBunTargetString(arch), "-", specifier.?});
     var releaseUrl = try std.mem.concat(vmAllocator.*, u8, &.{"https://github.com/oven-sh/bun/releases/download/", version, "/bun-", postfix, ".zip"});
 
     const homeDir = (try knownFolders.getPath(vmAllocator.*, knownFolders.KnownFolder.home)) orelse @panic("Failed to get path to home directory.");
