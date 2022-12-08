@@ -158,8 +158,8 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
     std.debug.print("Writing archive to binary...\n", .{});
 
     // Write compressed archive to binary
-    var written = try file.writeAll(compressed[0..@intCast(usize, compSize)]);
-    std.debug.print("Written {} bytes to binary\n", .{written});
+    _ = try file.writeAll(compressed[0..@intCast(usize, compSize)]);
+    std.debug.print("Written {} bytes to binary\n", .{compSize});
 
     // Write CRC32 hash + compressed size (10 + 10) bytes at the end
     {
