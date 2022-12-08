@@ -72,7 +72,10 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
         if(std.mem.eql(u8, entry.path, "bkg.config.json")) customConfig = true;
 
         // Read source into buffer
-        var file = try std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", entry.path}), .{});
+        var file = std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", entry.path}), .{}) catch |e| {
+            std.debug.print("Could not open {s}: {any}. Skipping...\n", .{entry.path, e});
+            continue;
+        };
         const buf: []u8 = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
 
         std.debug.print("Writing file {s} with {} bytes\n", .{entry.path, buf.len});
@@ -155,7 +158,7 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
     std.debug.print("Writing archive to binary...\n", .{});
 
     // Write compressed archive to binary
-    var written = try file.write(compressed[0..@intCast(usize, compSize)]);
+    var written = try file.writeAll(compressed[0..@intCast(usize, compSize)]);
     std.debug.print("Written {} bytes to binary\n", .{written});
 
     // Write CRC32 hash + compressed size (10 + 10) bytes at the end
@@ -171,8 +174,8 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
         try std.fmt.format(compSizeBufferStream.writer(), "{}", .{compSize});
         try std.fmt.format(hashBufferStream.writer(), "{}", .{hash});
 
-        _ = try file.write(hashBuffer);
-        _ = try file.write(compSizeBuffer);
+        _ = try file.writeAll(hashBuffer);
+        _ = try file.writeAll(compSizeBuffer);
     }
     std.debug.print("Done\n", .{});
 
