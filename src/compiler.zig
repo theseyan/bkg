@@ -131,19 +131,19 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
 
     // Open archive and read it's contents
     var archive = try std.fs.openFileAbsolute("/tmp/__bkg_build.tar", .{});
-    const buf: []u8 = try archive.readToEndAlloc(allocator, 1024 * 1024 * 1024); // We assume the archive is < 1 GiB
+    const buf: []u8 = try archive.readToEndAlloc(allocator, 5 * 1024 * 1024 * 1024); // We assume the archive is < 5 GiB
     defer allocator.free(buf);
 
     // Delete temporary archive file
     archive.close();
     try std.fs.deleteFileAbsolute("/tmp/__bkg_build.tar");
 
-    // Allocate 256 MiB buffer for storing compressed archive
-    var compressed: []u8 = try allocator.alloc(u8, 1024 * 1024 * 256);
+    // Allocate 512 MiB buffer for storing compressed archive
+    var compressed: []u8 = try allocator.alloc(u8, 512 * 1024 * 1024);
     defer allocator.free(compressed);
 
     // Perform LZ4 HC compression with compression level 12 (max)
-    var compSize = lz4.LZ4_compress_HC(buf.ptr, compressed.ptr, @intCast(c_int, buf.len), 1024 * 1024 * 256, @intCast(c_int, 12));
+    var compSize = lz4.LZ4_compress_HC(buf.ptr, compressed.ptr, @intCast(c_int, buf.len), 512 * 1024 * 1024, @intCast(c_int, 12));
 
     std.debug.print("Compressed to {} bytes\n", .{compSize});
 

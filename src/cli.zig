@@ -105,7 +105,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
             debug.print("{s}\n{s}\n", .{head, paramsStr});
         }
         else if (res.args.version) {
-            debug.print("0.0.2\n", .{});
+            debug.print("0.0.3\n", .{});
         }
         else if (res.args.targets) {
             debug.print("x86_64-linux\naarch64-linux\nx86_64-macos\naarch64-macos\n", .{});
