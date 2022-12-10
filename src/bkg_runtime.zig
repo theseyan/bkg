@@ -8,6 +8,7 @@ const std = @import("std");
 const runtime = @import("runtime.zig");
 const knownFolders = @import("known-folders");
 const config = @import("config.zig");
+const debug = @import("debug.zig");
 
 // Using evented IO causes a bug in the Zig compiler
 // https://github.com/ziglang/zig/issues/11985
@@ -44,10 +45,23 @@ pub fn main() !void {
     if(appDir != null) {
         // Directory was created
         try runtime.extractArchive(allocator, selfPath, appDirPath, headers);
+    }else {
+        // Directory already exists, load configuration
+        try config.load(allocator, try std.mem.concat(allocator, u8, &.{appDirPath, "/bkg.config.json"}), null);
+        if(config.get().debug) debug.debug = true;
+
+        if(debug.debug) {
+            debug.print("Debug logs are enabled", .{});
+            debug.print("Configuration file loaded from disk!", .{});
+            debug.print("App directory already exists, skipping extraction..", .{});
+        }
     }
 
-    // Load configuration file
-    try config.load(allocator, try std.mem.concat(allocator, u8, &.{appDirPath, "/bkg.config.json"}));
+    if(debug.debug) {
+        debug.print("CRC32 Hash:\t{s}", .{headers.hash});
+        debug.print("Compressed Size:\t{any} bytes", .{headers.compressed});
+        debug.print("Starting Bun runtime..", .{});
+    }
 
     // Execute process
     try runtime.execProcess(allocator, appDirPath, config.get());

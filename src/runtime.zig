@@ -5,8 +5,9 @@ const ChildProcess = std.ChildProcess;
 const std = @import("std");
 const lz4 = @import("translated/liblz4.zig");
 const mtar = @import("translated/libmicrotar.zig");
-const Config = @import("config.zig").Config;
+const config = @import("config.zig");
 const threadpool = @import("thread_pool.zig");
+const debug = @import("debug.zig");
 
 const ParseResult = struct {
     compressed: usize,
@@ -19,7 +20,6 @@ var alloc: std.mem.Allocator = undefined;
 var extractRoot: []const u8 = undefined;
 var m1 = std.Thread.Mutex{};
 var m2 = std.Thread.Mutex{};
-var startTime: i64 = undefined;
 var numTasks: usize = undefined;
 
 // Parses a bkg binary to get the compressed size header and CRC32 hash
@@ -125,7 +125,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     var decompressed: []u8 = try allocator.alloc(u8, 1024 * 1024 * 1024);
     
     // Store timestamp used for profiling
-    startTime = std.time.milliTimestamp();
+    debug.startTime = std.time.milliTimestamp();
 
     // Perform LZ4 decompression
     var result = lz4.LZ4_decompress_safe(buf[0..parsed.compressed].ptr, decompressed.ptr, @intCast(c_int, parsed.compressed), 1024 * 1024 * 1024);
@@ -137,12 +137,27 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     var header: *mtar.mtar_header_t = try allocator.create(mtar.mtar_header_t);
     _ = mtar_open_mem(&tar, &decompressed[0..@intCast(usize, result)]);
 
-    // std.debug.print("Reading archive...\n", .{});
+    // Load configuration file before everything else
+    _ = mtar.mtar_find(&tar, "bkg.config.json", header);
+    var configBuf: []u8 = alloc.alloc(u8, header.size) catch @panic("Failed to allocate memory for configuration file!");
+    _ = mtar.mtar_read_data(&tar, configBuf.ptr, header.size);
+    _ = mtar.mtar_rewind(&tar);
+    config.load(allocator, null, configBuf) catch @panic("Failed to parse configuration file!");
+    debug.debug = config.get().debug;
+
+    if(debug.debug) {
+        debug.init(allocator);
+        debug.print("Debug logs are enabled", .{});
+        debug.print("Configuration file loaded from archive!", .{});
+    }
 
     // Initialize threadpool with number of threads available in OS
+    const threads = try std.Thread.getCpuCount();
     pool = threadpool.init(.{
-        .max_threads = @intCast(u32, try std.Thread.getCpuCount())
+        .max_threads = @intCast(u32, threads)
     });
+
+    if(debug.debug) debug.print("Initialized thread pool using {any} threads", .{threads});
 
     // Initial no-op task
     var initTask = try allocator.create(threadpool.Task);
@@ -208,7 +223,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     }
     
     numTasks = batch.len - 1;
-    //std.debug.print("[{any} ms] Scheduling write batch with {any} tasks\n", .{std.time.milliTimestamp() - startTime, numTasks});
+    if(debug.debug) debug.print("Scheduling write batch with {any} tasks ({any}ms)", .{numTasks, std.time.milliTimestamp() - debug.startTime});
 
     // Schedule tasks to thread pool
     pool.schedule(batch);
@@ -216,7 +231,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     // Wait for completion
     pool.deinit();
 
-    //std.debug.print("[{any} ms] Extracted everything\n", .{std.time.milliTimestamp() - startTime});
+    if(debug.debug) debug.print("Extracted to disk! ({any}ms)", .{std.time.milliTimestamp() - debug.startTime});
 
     // Close the archive
     _ = mtar.mtar_close(&tar);
@@ -245,7 +260,7 @@ pub fn extractArchiveSingleThreaded(allocator: std.mem.Allocator, target: []cons
     // Decompressed archive can be upto 1024MB
     var decompressed: []u8 = try allocator.alloc(u8, 1024 * 1024 * 1024);
     
-    startTime = std.time.milliTimestamp();
+    debug.startTime = std.time.milliTimestamp();
 
     // Perform LZ4 decompression
     var result = lz4.LZ4_decompress_safe(buf[0..parsed.compressed].ptr, decompressed.ptr, @intCast(c_int, parsed.compressed), 1024 * 1024 * 1024);
@@ -293,7 +308,7 @@ pub fn extractArchiveSingleThreaded(allocator: std.mem.Allocator, target: []cons
 }
 
 // Initiates Bun runtime after extraction
-pub fn execProcess(allocator: std.mem.Allocator, root: []const u8, config: *Config) anyerror!void {
+pub fn execProcess(allocator: std.mem.Allocator, root: []const u8, configuration: *config.Config) anyerror!void {
 
     // Give executable permissions to bun
     var file: ?std.fs.File = std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", "bkg_bun"}), .{}) catch |e| switch(e) {
@@ -312,7 +327,7 @@ pub fn execProcess(allocator: std.mem.Allocator, root: []const u8, config: *Conf
     defer cmd_args.deinit();
     try cmd_args.appendSlice(&[_][]const u8{
         try std.mem.concat(allocator, u8, &.{root, "/", "bkg_bun"}),
-        try std.mem.concat(allocator, u8, &.{root, "/", config.entry})
+        try std.mem.concat(allocator, u8, &.{root, "/", configuration.entry})
     });
 
     // Add passed commandline arguments

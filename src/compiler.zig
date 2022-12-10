@@ -6,7 +6,7 @@ const builtin = @import("builtin");
 const defaultConfig = @import("config.zig").defaultConfig;
 
 // Performs the build process for a given Bun binary, target, project path and output path
-pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const u8, target: []const u8, project: []const u8, out: []const u8) anyerror![]const u8 {
+pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const u8, target: []const u8, project: []const u8, out: []const u8, debug: bool) anyerror![]const u8 {
 
     // Make sure outfile path is not an existing directory
     var isDir = std.fs.openDirAbsolute(out, .{}) catch |e| switch(e) {
@@ -19,7 +19,7 @@ pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const
     }
 
     // Build archive
-    try buildArchive(allocator, bunPath, project);
+    try buildArchive(allocator, bunPath, project, debug);
 
     // Copy bkg runtime to temporary directory
     try std.fs.copyFileAbsolute(bkgPath, "/tmp/__bkg_build_runtime", .{});
@@ -47,7 +47,7 @@ pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const
 }
 
 // Builds a TAR archive given a root directory
-pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []const u8) anyerror!void {
+pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []const u8, debug: bool) anyerror!void {
     
     std.debug.print("Building archive...\n", .{});
 
@@ -100,8 +100,15 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
     // If no custom config is present, add default config to archive
     if(customConfig == false) {
         std.debug.print("Configuration file not found, using default\n", .{});
-        _ = mtar.mtar_write_file_header(&tar, "bkg.config.json", defaultConfig.len);
-        _ = mtar.mtar_write_data(&tar, defaultConfig.ptr, defaultConfig.len);
+
+        var newConfig = defaultConfig;
+        if(debug) newConfig.debug = true;
+
+        var configString = try std.json.stringifyAlloc(allocator, newConfig, .{});
+        defer allocator.free(configString);
+
+        _ = mtar.mtar_write_file_header(&tar, "bkg.config.json", @intCast(c_uint, configString.len));
+        _ = mtar.mtar_write_data(&tar, configString.ptr, @intCast(c_uint, configString.len));
     }
     
     // Add Bun binary to archive
@@ -131,7 +138,7 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
 
     // Open archive and read it's contents
     var archive = try std.fs.openFileAbsolute("/tmp/__bkg_build.tar", .{});
-    const buf: []u8 = try archive.readToEndAlloc(allocator, 5 * 1024 * 1024 * 1024); // We assume the archive is < 5 GiB
+    const buf: []u8 = try archive.readToEndAlloc(allocator, 5 * 1024 * 1024 * 1024); // We assume the archive is <= 5 GiB
     defer allocator.free(buf);
 
     // Delete temporary archive file

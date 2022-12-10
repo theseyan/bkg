@@ -23,6 +23,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         \\  -b, --baseline         Use non-AVX2 (baseline) build of Bun for compatibility
         \\  --targets              Display list of supported targets
         \\  -v, --version          Display bkg version.
+        \\  -d, --debug            Enable debug logs at runtime
         \\  --runtime <str>        Path to custom Bun binary (not recommended)
         \\  <str>...
         \\
@@ -56,6 +57,9 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         // Whether to use a baseline build of Bun
         var baseline: ?[]const u8 = if (res.args.baseline) "baseline" else null;
 
+        // Whether to enable debug mode
+        var debugMode: bool = false;
+
         // TODO: Ability to use custom Bun binary
         if(res.args.runtime != null) {
             debug.print("Custom bun binary is not supported in this version, prebuilt will be used.\n", .{});
@@ -71,6 +75,10 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         }
 
         if (res.args.baseline) debug.print("Using non-AVX2 (baseline) build of Bun...\n", .{});
+        if (res.args.debug) {
+            debugMode = true;
+            debug.print("Building with Debug mode enabled...\n", .{});
+        }
 
         // Get output path
         if(res.args.output != null) {
@@ -92,8 +100,8 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         var bkgRuntimePath = try versionManager.downloadRuntime(try versionManager.getLatestBkgVersion(), target);
 
         // Build the executable
-        var out = try compiler.build(allocator, runtimePath, bkgRuntimePath, target, project, output);
-
+        var out = try compiler.build(allocator, runtimePath, bkgRuntimePath, target, project, output, debugMode);
+        
         // Finish up
         std.debug.print("Built {s} for target {s}.\n", .{std.fs.path.basename(out), target});
 
