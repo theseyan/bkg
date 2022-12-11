@@ -23,8 +23,7 @@ pub fn main() !void {
     defer arena.deinit();
 
     // Get path to this binary
-    var selfPath = try allocator.alloc(u8, 300);
-    selfPath = try std.fs.selfExePath(selfPath);
+    var selfPath = try std.fs.selfExePathAlloc(allocator);
     var basename = std.fs.path.basename(selfPath);
 
     // Parse executable headers
