@@ -1,6 +1,8 @@
 const std = @import("std");
 const cli = @import("cli.zig");
 
+const analyzer = @import("analyzer.zig");
+
 // Allocator
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var arena = std.heap.ArenaAllocator.init(gpa.allocator());
