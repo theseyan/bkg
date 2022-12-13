@@ -10,7 +10,7 @@ const Module = struct {
     path: []const u8,               // import-able path of the module
     name: []const u8,               // name of the module
     main: []const u8,               // Main entrypoint of package
-    deps: []*const Module                 // list of dependencies
+    deps: []*const Module           // list of dependencies
 };
 
 const PackageJSON = struct {
@@ -27,7 +27,7 @@ pub fn init(allocator: std.mem.Allocator) !void {
 }
 
 // Analyzer
-pub fn analyze(allocator: std.mem.Allocator, root: []const u8) !void {
+pub fn analyze(allocator: std.mem.Allocator, root: []const u8) !*std.ArrayList(Module) {
     var dir = try std.fs.openIterableDirAbsolute(root, .{});
     defer dir.close();
     var walker = try dir.walk(allocator);
@@ -75,6 +75,8 @@ pub fn analyze(allocator: std.mem.Allocator, root: []const u8) !void {
 
         try modules.replaceRange(i, 1, &.{replaceModule});
     }
+
+    return &modules;
 }
 
 // Gets a pointer to a module stored in repository
@@ -124,7 +126,6 @@ pub fn parsePackage(allocator: std.mem.Allocator, root: []const u8, path: []cons
     var depsArray: [][]const u8 = undefined;
     var iterator = deps.?.Object.iterator();
 
-
     if(deps == null or deps.?.Object.count() == 0) {
         depsArray = &.{};
     }else {
@@ -142,6 +143,22 @@ pub fn parsePackage(allocator: std.mem.Allocator, root: []const u8, path: []cons
         .main = if(main.len == 0) "index.js" else main,
         .deps =  depsArray
     };
+}
+
+// Checks if a path is a module
+pub fn isModule(allocator: std.mem.Allocator, path: []const u8) !bool {
+    var file: ?std.fs.File = std.fs.openFileAbsolute(try std.mem.concat(allocator, u8, &.{path, "/package.json"}), .{}) catch |e| switch (e) {
+        error.FileNotFound => null,
+        error.NotDir => null,
+        else => return e
+    };
+    
+    if(file == null) {
+        return false;
+    }else {
+        file.?.close();
+        return true;
+    }
 }
 
 // Tests a path string against a glob

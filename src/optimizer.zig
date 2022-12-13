@@ -15,6 +15,7 @@ pub const BuildResultFileLocation = struct {
 };
 
 pub const OptimizerMessage = struct {
+    ID: ?[]const u8,
     PluginName: []const u8,
     Text: []const u8,
     Location: ?BuildResultFileLocation,
@@ -94,8 +95,9 @@ pub fn optimize(allocator: std.mem.Allocator, entry: []const u8, out: []const u8
         optimizeResult.inputs = inputsArrayList.toOwnedSlice();
     }
 
-    std.debug.print("{s}\n", .{optimizeResult.inputs[0]});
+    // Free parsed struct
+    json.parseFree(BuildResult, buildResult, .{.allocator = allocator, .ignore_unknown_fields = true});
 
-    return error.Done;
+    return optimizeResult;
 
 }
