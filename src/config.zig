@@ -4,15 +4,26 @@ const json = std.json;
 
 // Configuration struct
 pub const Config = struct {
-    entry: []const u8,  // Entrypoint of the application
-    debug: bool         // Toggles debug logs at runtime
+    entry: []const u8 = "index.js",     // Entrypoint of the application
+    debug: bool = false,                // Toggles debug logs at runtime
+    lto: ?struct {                      // Link-Time Optimization
+        format: []const u8 = "cjs",     // "cjs" or "esm"
+        includes: [][]const u8 = &.{}   // Globs of file paths to package as assets into the binary
+    } = .{
+        .format = "cjs",
+        .includes = &.{}
+    }
 };
 
 // Default configuration JSON
 // Injected automatically if no bkg.config.json was provided
 pub const defaultConfig: Config = .{
     .entry = "index.js",
-    .debug = false
+    .debug = false,
+    .lto = .{
+        .format = "cjs",
+        .includes = &.{}
+    }
 };
 
 // Stores the configuration
@@ -42,6 +53,22 @@ pub fn load(allocator: std.mem.Allocator, path: ?[]const u8, buffer: ?[]u8) !voi
         break :x res catch |e| {
             return e;
         };
+    };
+
+}
+
+// Attempt to load configuration from disk
+// If not, load defaults
+pub fn tryLoadConfig(allocator: std.mem.Allocator, path: []const u8) !void {
+    
+    load(allocator, path, null) catch |e| switch(e) {
+        error.FileNotFound => {
+            var configObj = try allocator.create(Config);
+            configObj.* = defaultConfig;
+            config = configObj.*;
+            return;
+        },
+        else => return e
     };
 
 }

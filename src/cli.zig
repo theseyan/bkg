@@ -6,6 +6,8 @@ const compiler = @import("compiler.zig");
 const versionManager = @import("version_manager.zig");
 const debug = std.debug;
 const io = std.io;
+const lto = @import("lto.zig");
+const config = @import("config.zig");
 
 // Initializes CLI environment
 pub fn init(allocator: std.mem.Allocator) anyerror!void {
@@ -17,11 +19,13 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         \\Options:
     ;
     const paramsStr = 
-        \\  -h, --help             Display this help message.
         \\  -o, --output <str>     Output file name
+        \\  -i, --includes <str>   Comma-separated list of files to include into the binary
         \\  -t, --target <str>     Target architecture to build for (default is Host)
         \\  -b, --baseline         Use non-AVX2 (baseline) build of Bun for compatibility
+        \\  --nolto                Disable Link-Time Optimizations (not recommended)
         \\  --targets              Display list of supported targets
+        \\  -h, --help             Display this help message.
         \\  -v, --version          Display bkg version.
         \\  -d, --debug            Enable debug logs at runtime
         \\  --runtime <str>        Path to custom Bun binary (not recommended)
@@ -91,6 +95,26 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
             output = try std.mem.concat(allocator, u8, &.{cwdPath, "/app"});
         }
 
+        // Get configuration
+        try config.tryLoadConfig(allocator, try std.mem.concat(allocator, u8, &.{project, "/bkg.config.json"}));
+
+        // Whether LTO is enabled
+        const isLTO = if(res.args.nolto) false else if(config.get().lto == null) false else true;
+
+        // List of globs to package as assets into the binary
+        var includes: [][]const u8 = undefined;
+
+        if(res.args.includes != null) {
+            var iterator = std.mem.split(u8, res.args.includes.?, ",");
+            var list = std.ArrayList([]const u8).init(allocator);
+            while(iterator.next()) |glob| {
+                try list.append(glob);
+            }
+            includes = list.toOwnedSlice();
+        }else {
+            includes = config.get().lto.?.includes;
+        }
+
         // Initialize version manager
         try versionManager.init(allocator);
         defer versionManager.deinit();
@@ -99,8 +123,24 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         var runtimePath = try versionManager.downloadBun(try versionManager.getLatestBunVersion(), target, baseline);
         var bkgRuntimePath = try versionManager.downloadRuntime(try versionManager.getLatestBkgVersion(), target);
 
+        // Initialize LTO
+        if(isLTO) {
+            try lto.init(allocator, project, includes);
+
+            std.debug.print("Performing Link-Time Optimizations...\n", .{});
+            project = try lto.LTO(config.get().entry, config.get().lto.?.format);
+        }else {
+            std.debug.print("Skipping Link-Time Optimizations because it was disabled. It is highly recommended to enable LTO in production builds.\n", .{});
+        }
+
         // Build the executable
         var out = try compiler.build(allocator, runtimePath, bkgRuntimePath, target, project, output, debugMode);
+
+        // Clean up
+        if(isLTO) {
+            std.debug.print("Cleaning up...\n", .{});
+            try lto.cleanup();
+        }
         
         // Finish up
         std.debug.print("Built {s} for target {s}.\n", .{std.fs.path.basename(out), target});
