@@ -3,6 +3,13 @@
 const std = @import("std");
 const boptimizer = @import("translated/boptimizer.zig");
 const json = std.json;
+const lto = @import("lto.zig");
+const analyzer = @import("analyzer.zig");
+
+// Glob patterns to exclude when copying a module
+pub const ModuleCopyExcludes = [_][]const u8{
+    ".gitignore", ".git", "*.md", ".prettierrc", "tsconfig.base.json", ".github", "LICENSE"
+};
 
 pub const BuildResultFileLocation = struct {
     File: []const u8,
@@ -42,12 +49,56 @@ pub const OptimizeResult = struct {
     }
 };
 
+// Optimizes a module in-place, and places it on disk to a temporary location
+// Module must be pure
+pub fn optimizePureModuleToDisk(allocator: std.mem.Allocator, module: []const u8, entry: []const u8, outDir: []const u8) !void {
+    const modulePath = try std.mem.concat(allocator, u8, &.{outDir, "/node_modules/", module});
+
+    // Make module path
+    try std.fs.cwd().makePath(modulePath);
+
+    // Optimize module
+    var result: *OptimizeResult = try optimize(allocator, entry, try std.mem.concat(allocator, u8, &.{modulePath, "/index.js"}), "cjs", "");
+
+    if(result.status != .Success and lto.checkAllowedDynamicModule(module) == false) {
+        return error.FailedOptimizePureModule;
+    }
+}
+
+// Copies a module to another location on disk
+pub fn copyModuleToDisk(allocator: std.mem.Allocator, root: []const u8, module: []const u8, outDir: []const u8) !void {
+    const modulePath = try std.mem.concat(allocator, u8, &.{outDir, "/node_modules/", module});
+    const origPath = try std.mem.concat(allocator, u8, &.{root, "/node_modules/", module});
+
+    // Make module path
+    try std.fs.cwd().makePath(modulePath);
+
+    var dir = try std.fs.openIterableDirAbsolute(origPath, .{});
+    defer dir.close();
+    var walker = try dir.walk(allocator);
+
+    walkerLoop: while (try walker.next()) |entry| {
+        // Ignore files/folder that are excluded
+        for(ModuleCopyExcludes[0..ModuleCopyExcludes.len]) |glob| { if(analyzer.globMatch(glob, entry.path)) continue :walkerLoop; }
+
+        if(entry.kind == .Directory) {
+            try std.fs.makeDirAbsolute(try std.mem.concat(allocator, u8, &.{modulePath, "/", entry.path}));
+        }else {
+            try std.fs.copyFileAbsolute(try std.mem.concat(allocator, u8, &.{origPath, "/", entry.path}), try std.mem.concat(allocator, u8, &.{modulePath, "/", entry.path}), .{});
+        }
+    }
+}
+
 // Performs optimization on an entry point recursively
-pub fn optimize(allocator: std.mem.Allocator, entry: []const u8, out: []const u8, externals: []const u8) !*OptimizeResult {
+pub fn optimize(allocator: std.mem.Allocator, entry: []const u8, out: []const u8, format: []const u8, externals: []const u8) !*OptimizeResult {
 
-    const resultPtr = boptimizer.build(entry.ptr, out.ptr, externals.ptr);
+    const entrySentinel = try std.mem.concatWithSentinel(allocator, u8, &.{entry}, 0); 
+    const outSentinel = try std.mem.concatWithSentinel(allocator, u8, &.{out}, 0);
+    const formatSentinel = try std.mem.concatWithSentinel(allocator, u8, &.{format}, 0);
+
+    const resultPtr = boptimizer.build(entrySentinel.ptr, outSentinel.ptr, formatSentinel.ptr, externals.ptr);
     const result: []u8 = resultPtr[0..std.mem.indexOfSentinel(u8, 0, resultPtr)];
-
+    
     // Get wrapper build result
     const buildResult: BuildResult = x: {
         var stream = json.TokenStream.init(result);
@@ -76,9 +127,17 @@ pub fn optimize(allocator: std.mem.Allocator, entry: []const u8, out: []const u8
     var parser = json.Parser.init(allocator, false);
     var tree = try parser.parse(buildResult.Metadata.?);
 
-    // Get output bundle size in bytes
     var outputs = tree.root.Object.get("outputs");
-    optimizeResult.meta.bundleSize = outputs.?.Object.get(std.fs.path.basename(out)).?.Object.get("bytes").?.Integer;
+    var outputsIterator = outputs.?.Object.iterator();
+    var outputBasename = std.fs.path.basename(out);
+
+    // Get output bundle size in bytes
+    while(outputsIterator.next()) |output| {
+        if(std.mem.eql(u8, std.fs.path.basename(output.key_ptr.*), outputBasename)) {
+            optimizeResult.meta.bundleSize = outputs.?.Object.get(output.key_ptr.*).?.Object.get("bytes").?.Integer;
+            break;
+        }
+    }
 
     // Parse list of input sources
     var inputsObj = tree.root.Object.get("inputs");

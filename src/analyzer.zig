@@ -61,7 +61,15 @@ pub fn analyze(allocator: std.mem.Allocator, root: []const u8) !*std.ArrayList(M
         var depsArrayList = std.ArrayList(*const Module).init(allocator);
         
         for(parsed.deps[0..parsed.deps.len]) |dep| {
-            var depPtr = try getModulePtr(dep);
+            var depPtr = getModulePtr(dep) catch |e| switch(e) {
+                error.ModuleNotFound => {
+                    // We don't want a missing module to break LTO completely
+                    // Some packages (eg: resolve) have tests to intentionally have missing modules
+                    std.debug.print("Module `{s}` has missing dependency: `{s}`. Skipping..\n", .{module.name, dep});
+                    continue;
+                },
+                else => return e
+            };
             try depsArrayList.append(depPtr);
         }
 
@@ -118,11 +126,25 @@ pub fn parsePackage(allocator: std.mem.Allocator, root: []const u8, path: []cons
 
     // Parse the JSON payload
     var parser = std.json.Parser.init(allocator, false);
-    var tree = parser.parse(buf) catch |e| @panic(@errorName(e));
+    var tree: ?std.json.ValueTree = parser.parse(buf) catch |e| switch (e) {
+        error.UnexpectedEndOfJson => null,
+        else => return e
+    };
 
-    var deps = tree.root.Object.get("dependencies");
-    var main = tree.root.Object.get("main").?.String;
-    var pkgName = tree.root.Object.get("name").?.String;
+    // We don't want a malformed package.json to stop the LTO process
+    // Moreover, some packages (eg: resolve) intentionally have malformed JSON for testing
+    if(tree == null) {
+        std.debug.print("{s} has malformed JSON. Skipping..\n", .{path});
+        return PackageJSON{
+            .name = "",
+            .main = "index.js",
+            .deps =  &.{}
+        };
+    }
+
+    var deps = tree.?.root.Object.get("dependencies");
+    var main = tree.?.root.Object.get("main").?.String;
+    var pkgName = tree.?.root.Object.get("name").?.String;
     var depsArray: [][]const u8 = undefined;
     var iterator = deps.?.Object.iterator();
 

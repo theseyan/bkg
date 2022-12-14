@@ -91,7 +91,7 @@ pub const GoSlice = extern struct {
     len: GoInt,
     cap: GoInt,
 };
-pub extern fn build(entry: [*c]const u8, out: [*c]const u8, externals: [*c]const u8) [*:0]u8;
+pub extern fn build(entry: [*c]const u8, out: [*c]const u8, format: [*c]const u8, externals: [*c]const u8) [*:0]u8;
 pub const __INTMAX_C_SUFFIX__ = @compileError("unable to translate macro: undefined identifier `L`"); // (no file):80:9
 pub const __UINTMAX_C_SUFFIX__ = @compileError("unable to translate macro: undefined identifier `UL`"); // (no file):86:9
 pub const __INT64_C_SUFFIX__ = @compileError("unable to translate macro: undefined identifier `L`"); // (no file):169:9

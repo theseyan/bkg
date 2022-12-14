@@ -7,8 +7,10 @@ const analyzer = @import("analyzer.zig");
 var allocator: std.mem.Allocator = undefined;
 var root: []const u8 = undefined;
 var tempDir: []const u8 = undefined;
+var includes: [][]const u8 = &.{};
 
 // Modules marked as external
+// They will not be optimized
 var externals: std.ArrayList([]const u8) = undefined;
 
 // External modules with all pure dependencies
@@ -17,17 +19,85 @@ var leafModules: std.ArrayList([]const u8) = undefined;
 
 // Some modules, although being dynamic, can mostly function even when bundled
 // This is an inexhaustible list of such exceptions
-pub const AllowedDynamicModules = [_][]const u8{
-    "express"
-};
+pub const AllowedDynamicModules = [_][]const u8{"express"};
 
 // Force modules to be marked external, even if they are pure
 pub const ForcedExternalModules = [_][]const u8{};
 
-pub fn init(alloc: std.mem.Allocator, rootDir: []const u8) !void {
+pub fn init(alloc: std.mem.Allocator, rootDir: []const u8, includesArray: [][]const u8) !void {
     try analyzer.init(alloc);
     allocator = alloc;
     root = rootDir;
+    includes = includesArray;
+
+    // Create temporary build directory
+    tempDir = try createTempBuildDir();
+}
+
+// Performs LTO on an entrypoint
+pub fn LTO(entry: []const u8, format: []const u8) ![]const u8 {
+
+    // Mark externals and leaf modules
+    try markExternals(entry, format);
+
+    // Optimize every leaf module in-place
+    for(leafModules.items[0..leafModules.items.len]) |leaf| {
+        std.debug.print("Optimizing leaf `{s}` in-place...\n", .{leaf});
+        const entrypoint = try analyzer.getModulePtr(leaf);
+        try optimizer.optimizePureModuleToDisk(allocator, leaf, try std.mem.concat(allocator, u8, &.{root, "/node_modules/", leaf, "/", entrypoint.main}), tempDir);
+    }
+
+    // Copy every external module 
+    for(externals.items[0..externals.items.len]) |external| {
+        std.debug.print("Copying external `{s}`...\n", .{external});
+        try optimizer.copyModuleToDisk(allocator, root, external, tempDir);
+    }
+
+    // Copy included assets
+    std.debug.print("Copying assets...\n", .{});
+    var dir = try std.fs.openIterableDirAbsolute(root, .{});
+    defer dir.close();
+    var walker = try dir.walk(allocator);
+
+    while (try walker.next()) |file| {
+        if(file.kind == .Directory) continue;
+        for(includes[0..includes.len]) |glob| {
+            if(analyzer.globMatch(glob, file.path)) {
+                const basename = std.fs.path.basename(file.path);
+
+                // Make sure directory exists
+                try std.fs.cwd().makePath(try std.mem.concat(allocator, u8, &.{tempDir, "/", file.path[0..(file.path.len - basename.len - 1)]}));
+
+                std.debug.print("Copying `{s}`...\n", .{file.path});
+
+                // Copy the file
+                try std.fs.copyFileAbsolute(try std.mem.concat(allocator, u8, &.{root, "/", file.path}), try std.mem.concat(allocator, u8, &.{tempDir, "/", file.path}), .{});
+            }
+        }
+    }
+
+    // Optimize application entrypoint
+    std.debug.print("Optimizing entrypoint...\n", .{});
+    const externalsString = try std.mem.concat(allocator, u8, &.{try std.mem.join(allocator, ",", externals.items), ","});
+    var result = try optimizer.optimize(allocator, try std.mem.concat(allocator, u8, &.{root, "/", entry}), try std.mem.concat(allocator, u8, &.{tempDir, "/index.js"}), format, externalsString);
+    
+    if(result.status == .Failure) {
+        return error.LTOFailedOptimizeEntrypoint;
+    }else if(result.status == .Warning) {
+        for(result.warnings[0..result.warnings.len]) |warning| {
+            std.debug.print("Warning: `{s}` [{s}:{any}:{any}]\n", .{warning.Location.?.LineText, warning.Location.?.File, warning.Location.?.Line, warning.Location.?.Column});
+            std.debug.print("{s}\n", .{warning.Text});
+        }
+    }
+
+    std.debug.print("⚡ Bundled and optimized application code ({any} KiB)!\n", .{@divTrunc(result.meta.bundleSize, 1024)});
+    return tempDir;
+
+}
+
+// Cleans up build artifacts generated during LTO
+pub fn cleanup() !void {
+    try std.fs.cwd().deleteTree(tempDir);
 }
 
 // Creates a temporary directory for storing build assets
@@ -44,10 +114,9 @@ fn createTempBuildDir() ![]const u8 {
     return path;
 }
 
-
 // Statically analyzes node_modules to find native modules
 // Gets dynamic modules and marks external modules
-pub fn markExternals(entry: []const u8) !void {
+pub fn markExternals(entry: []const u8, format: []const u8) !void {
 
     const nodeModules = try std.mem.concat(allocator, u8, &.{root, "/node_modules"});
     const entryAbsolute = try std.mem.concat(allocator, u8, &.{root, "/", entry});
@@ -72,7 +141,7 @@ pub fn markExternals(entry: []const u8) !void {
     }
 
     // Mark dynamic modules
-    var dynamicModules = getDynamicModules(entryAbsolute) catch |e| switch(e) {
+    var dynamicModules = getDynamicModules(entryAbsolute, format) catch |e| switch(e) {
         error.SourceIsDynamic => {
             std.debug.print("Error: Dynamic require/import found in source code! bkg is unable optimize this with LTO, please rewrite it to a static import or disable LTO with `--nolto` flag.\n", .{});
             return e;
@@ -82,14 +151,6 @@ pub fn markExternals(entry: []const u8) !void {
 
     for(dynamicModules[0..dynamicModules.len]) |module| {
         recursiveMark(module);
-    }
-
-    std.debug.print("All externals:\n", .{});
-    for(externals.items[0..externals.items.len]) |item| {
-        std.debug.print("[external] {s}\n", .{item});
-    }
-    for(leafModules.items[0..leafModules.items.len]) |item| {
-        std.debug.print("[leaf] {s}\n", .{item});
     }
 
 }
@@ -103,25 +164,24 @@ pub fn recursiveMark(module: []const u8) void {
 
     // Get dynamic dependencies of this module
     var modulePtr = analyzer.getModulePtr(module) catch |e| @panic(@errorName(e));
-    var dynamicModules = getDynamicModules(std.mem.concatWithSentinel(allocator, u8, &.{root, "/node_modules/", modulePtr.path, "/", modulePtr.main}, 0) catch |e| @panic(@errorName(e))) catch |e| @panic(@errorName(e));
+    var dynamicModules = getDynamicModules(std.mem.concatWithSentinel(allocator, u8, &.{root, "/node_modules/", modulePtr.path, "/", modulePtr.main}, 0) catch |e| @panic(@errorName(e)), "cjs") catch |e| @panic(@errorName(e));
 
-    if(dynamicModules.len == 0) {
-        // This external module has all pure dependencies
-        std.debug.print("{s} is external module with all {any} pure dependencies\n", .{module, modulePtr.deps.len});
-        externals.append(module) catch |e| @panic(@errorName(e));
+    std.debug.print("`{s}` is external module with {any} impure dependencies\n", .{module, dynamicModules.len});
+    
+    // This module is external, but it has dynamic dependencies which must also be marked
+    externals.append(module) catch |e| @panic(@errorName(e));
 
-        // Mark its dependencies as leaf external modules
-        for(modulePtr.deps[0..modulePtr.deps.len]) |leaf| {
-            leafModules.append(leaf.name) catch |e| @panic(@errorName(e));
-            std.debug.print("Marked {s} as external leaf module\n", .{leaf.name});
-        }
-    }else {
-        std.debug.print("{s} is external module with {any} impure dependencies\n", .{module, dynamicModules.len});
-        // This module is external, but it has dynamic dependencies which must also be marked
-        externals.append(module) catch |e| @panic(@errorName(e));
-        for(dynamicModules[0..dynamicModules.len]) |mod| {
-            return recursiveMark(mod);
-        }
+    // Any pure dependencies are leaf modules
+    leafLoop: for(modulePtr.deps[0..modulePtr.deps.len]) |leaf| {
+        for(dynamicModules[0..dynamicModules.len]) |mod| { if(std.mem.eql(u8, leaf.path, mod)) continue :leafLoop; }
+
+        leafModules.append(leaf.name) catch |e| @panic(@errorName(e));
+        std.debug.print("Marked `{s}` as external leaf module\n", .{leaf.name});
+    }
+
+    // Mark dynamic dependencies
+    for(dynamicModules[0..dynamicModules.len]) |mod| {
+        return recursiveMark(mod);
     }
 
 }
@@ -135,16 +195,20 @@ pub fn checkAllowedDynamicModule(module: []const u8) bool {
 }
 
 // Runs an optimizer pass to find modules with dynamic imports/requires
-pub fn getDynamicModules(entry: []const u8) ![][]const u8 {
-    tempDir = try createTempBuildDir();
-    var tempFile = try std.mem.concatWithSentinel(allocator, u8, &.{tempDir, "/tempOptimizerPass.js"}, 0);
-    var result = try optimizer.optimize(allocator, entry, tempFile, "");
+pub fn getDynamicModules(entry: []const u8, format: []const u8) ![][]const u8 {
+    var tempFile = try std.mem.concat(allocator, u8, &.{tempDir, "/tempOptimizerPass.js"});
+    var result = try optimizer.optimize(allocator, entry, tempFile, format, "");
     const nodeModules = try std.mem.concat(allocator, u8, &.{root, "/node_modules"});
 
     // Delete temp bundled file
     if(result.status != .Failure) { try std.fs.deleteFileAbsolute(tempFile); }
     else {
-        std.debug.print("Error: {s}\n", .{result.errors[0].Text});
+        for(result.errors[0..result.errors.len]) |err| {
+            std.debug.print("LTO Error: {s}\n", .{err.Text});
+            std.debug.print("at `{s}` [{s}:{any}:{any}]\n", .{err.Location.?.LineText, err.Location.?.File, err.Location.?.Line, err.Location.?.Column});
+        }
+        std.debug.print("To build without LTO, you can run with `--nolto`.\n", .{});
+
         return error.OptimizeFailed;
     }
 
