@@ -42,6 +42,7 @@ pub fn analyze(allocator: std.mem.Allocator, root: []const u8) !*std.ArrayList(M
             const parsed = try parsePackage(allocator, root, entry.path);
             const name = if (parsed.name.len == 0) std.fs.path.basename(path) else parsed.name;
             const modtype = try analyzeModule(allocator, try std.mem.concat(allocator, u8, &.{root, "/", path}));
+
             var deps = std.ArrayList(*const Module).init(allocator);
 
             // Register the module to store
@@ -148,6 +149,17 @@ pub fn parsePackage(allocator: std.mem.Allocator, root: []const u8, path: []cons
     var pkgName = tree.?.root.Object.get("name");
     var depsArray: [][]const u8 = undefined;
 
+    // Strings guaranteed to be valid
+    var mainStr: []const u8 = undefined;
+    var pkgNameStr: []const u8 = undefined;
+
+    // Validate fields
+    if(main != null and (switch(main.?) {.String => true, else => false })) { mainStr = main.?.String; }
+    else { mainStr = "index.js"; }
+    if(pkgName != null and (switch(pkgName.?) {.String => true, else => false })) { pkgNameStr = pkgName.?.String; }
+    else { pkgNameStr = ""; }
+
+
     if(deps == null or deps.?.Object.count() == 0) {
         depsArray = &.{};
     }else {
@@ -162,9 +174,9 @@ pub fn parsePackage(allocator: std.mem.Allocator, root: []const u8, path: []cons
     }
 
     return PackageJSON{
-        .name = if(pkgName != null) pkgName.?.String else "",
-        .main = if(main != null) main.?.String else "index.js",
-        .deps =  depsArray
+        .name = pkgNameStr,
+        .main = mainStr,
+        .deps = depsArray
     };
 }
 
