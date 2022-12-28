@@ -5,6 +5,7 @@ const json = std.json;
 const knownFolders = @import("known-folders");
 const zip = @import("translated/libzip.zig");
 const zfetch = @import("zfetch");
+const debug = @import("debug.zig");
 
 // GitHub API URL for fetching latest Bun & bkg releases
 const bunLatestAPI = "https://api.github.com/repos/oven-sh/bun/releases/latest";
@@ -22,6 +23,9 @@ pub const APIReleaseTag = struct{
 // Inits zfetch, makes sure .bkg directory exists
 pub fn init(allocator: std.mem.Allocator) anyerror!void {
 
+    // Save pointer to allocator
+    vmAllocator = &allocator;
+
     // .bkg directory present in home directory
     const homeDir = (try knownFolders.getPath(vmAllocator.*, knownFolders.KnownFolder.home)) orelse @panic("Failed to get path to home directory.");
     const bkgDir = try std.mem.concat(vmAllocator.*, u8, &.{homeDir, "/.bkg"});
@@ -36,9 +40,6 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
 
     // Initialize zfetch
     try zfetch.init();
-
-    // Save pointer to allocator
-    vmAllocator = &allocator;
 
 }
 
