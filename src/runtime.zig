@@ -61,7 +61,7 @@ fn extractCallback(op: *threadpool.Task) void {
     var name = op.data.name orelse return;
 
     var header = op.data.header;
-    var tar = op.data.tar;
+    var tar = op.data.tar;    
 
     // Allocate memory for this file
     var fileBuf: []u8 = alloc.alloc(u8, header.size) catch @panic("Failed to allocate memory for extracted file!");
@@ -133,11 +133,8 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
 
     // Open decompressed archive
     var tar: mtar.mtar_t = std.mem.zeroes(mtar.mtar_t);
-    var memStream: mtar.mtar_mem_stream_t = std.mem.zeroes(mtar.mtar_mem_stream_t);
     var header: *mtar.mtar_header_t = try allocator.create(mtar.mtar_header_t);
-
-    _ = mtar.mtar_init_mem_stream(&memStream, decompressed[0..@intCast(usize, result)].ptr, @intCast(usize, result));
-    _ = mtar.mtar_open_mem(&tar, &memStream);
+    _ = mtar_open_mem(&tar, decompressed[0..@intCast(usize, result)].ptr);
 
     // Load configuration file before everything else
     _ = mtar.mtar_find(&tar, "bkg.config.json", header);
@@ -198,6 +195,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
 
             // Allocate TAR and header objects for this task
             var dupeTar: *mtar.mtar_t = alloc.create(mtar.mtar_t) catch @panic("Failed to allocate TAR struct");
+
             dupeTar.* = tar;
             var dupeHeader = try allocator.create(mtar.mtar_header_t);
             dupeHeader.* = header.*;
@@ -373,5 +371,57 @@ pub fn exec(a: std.mem.Allocator, cwd: []const u8, argv: []const []const u8) !vo
             return error.CommandFailed;
         },
     }
+
+}
+
+// Callback functions required by microtar
+// Streams decompressed LZ4 buffer directly to mtar in memory
+
+fn mtar_mem_write(tar: [*c]mtar.mtar_t, data: ?*const anyopaque, size: c_uint) callconv(.C) c_int {
+    _ = tar;
+    _ = data;
+    _ = size;
+    return mtar.MTAR_EWRITEFAIL;
+}
+
+// mem_read should supply data to microtar
+fn mtar_mem_read(tar: ?*mtar.mtar_t, data: ?*anyopaque, size: c_uint) callconv(.C) c_int {
+    
+    // TODO: Return error on null pointer?
+    const dataPtr = data orelse return mtar.MTAR_ENULLRECORD;
+    const thisTar = tar orelse return mtar.MTAR_EFAILURE;
+
+    const buffer = @ptrCast([*]u8, @alignCast(@alignOf(u8), dataPtr));
+    const streamPtr = thisTar.stream orelse return mtar.MTAR_ENULLRECORD;
+    const streamBuffer: [*]u8 = @ptrCast([*]u8, @alignCast(@alignOf([*]u8), streamPtr));
+
+    //const end = if (streamBuffer.*.len < (thisTar.pos + size)) streamBuffer.*.len else (thisTar.pos + size);
+    for (streamBuffer[thisTar.pos..(thisTar.pos + size)]) |b, i| buffer[i] = b;
+    
+    return mtar.MTAR_ESUCCESS;
+
+}
+
+fn mtar_mem_seek(tar: ?*mtar.mtar_t, offset: c_uint) callconv(.C) c_int {
+    _ = tar;
+    _ = offset;
+    return mtar.MTAR_ESUCCESS;
+}
+
+fn mtar_mem_close(tar: ?*mtar.mtar_t) callconv(.C) c_int {
+    _ = tar;
+    return mtar.MTAR_ESUCCESS;
+}
+
+fn mtar_open_mem(tar: *mtar.mtar_t, data: [*]u8) c_int {
+
+    tar.write = mtar_mem_write;
+    tar.read = mtar_mem_read;
+    tar.seek = mtar_mem_seek;
+    tar.close = mtar_mem_close;
+    tar.stream = data;
+
+    // Return ok
+    return mtar.MTAR_ESUCCESS;
 
 }
