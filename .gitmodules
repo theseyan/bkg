@@ -16,3 +16,6 @@
 [submodule "deps/zfetch"]
 	path = deps/zfetch
 	url = https://github.com/truemedian/zfetch
+[submodule "deps/bOptimizer"]
+	path = deps/bOptimizer
+	url = https://github.com/theseyan/bOptimizer

@@ -8,10 +8,11 @@ pub const Config = struct {
     debug: bool = false,                // Toggles debug logs at runtime
     lto: ?struct {                      // Link-Time Optimization
         format: []const u8 = "cjs",     // "cjs" or "esm"
-        includes: [][]const u8 = &.{}   // Globs of file paths to package as assets into the binary
+        includes: [][]const u8 = &.{},  // Globs of file paths to package as assets into the binary
     } = .{
         .format = "cjs",
-        .includes = &.{}
+        .includes = &.{},
+
     }
 };
 

@@ -85,6 +85,11 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
             continue;
         };
         const buf: []u8 = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
+        const mode = try file.mode();
+
+        if(mode & 0o100 == 0o100) {
+            std.debug.print("{s} is executable\n", .{entry.path});
+        }
 
         std.debug.print("Writing file {s} with {} bytes\n", .{entry.path, buf.len});
 

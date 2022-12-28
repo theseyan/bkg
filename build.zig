@@ -5,6 +5,7 @@ pub fn build(b: *std.build.Builder) !void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
     const exe = b.addExecutable("bkg", "src/main.zig");
+    exe.setTarget(target);
 
     // Strip debug symbols by default
     // Should be disabled during development/debugging
@@ -14,6 +15,21 @@ pub fn build(b: *std.build.Builder) !void {
     //exe.use_stage1 = true;
 
     exe.linkLibC();
+
+    // Link bOptimizer
+    if(target.getOs().tag == .linux and target.getCpu().arch == .x86_64) {
+        exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-x86_64-linux.a");
+    }else if(target.getOs().tag == .linux and target.getCpu().arch == .aarch64) {
+        exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-aarch64-linux.a");
+    }else if(target.getOs().tag == .macos and target.getCpu().arch == .x86_64) {
+        // b.sysroot = "/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root";
+        // exe.addLibraryPath("/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root/usr/lib");
+        // exe.addFrameworkPath("/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root/System/Library/Frameworks");
+        // exe.linkFramework("CoreFoundation");
+        exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-x86_64-macos.a");
+    }else if(target.getOs().tag == .macos and target.getCpu().arch == .aarch64) {
+        exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-aarch64-macos.a");
+    }
 
     // Compile LZ4 library
     exe.addCSourceFile("deps/lz4/lib/lz4.c", &.{});
@@ -34,7 +50,6 @@ pub fn build(b: *std.build.Builder) !void {
     // Link known-folders
     exe.addPackagePath("known-folders", "deps/known-folders/known-folders.zig");
 
-    exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
 

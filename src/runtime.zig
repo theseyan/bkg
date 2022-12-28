@@ -130,7 +130,7 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     // Perform LZ4 decompression
     var result = lz4.LZ4_decompress_safe(buf[0..parsed.compressed].ptr, decompressed.ptr, @intCast(c_int, parsed.compressed), 1024 * 1024 * 1024);
 
-    //std.debug.print("[{any}] Decompressed to memory\n", .{std.time.milliTimestamp() - startTime});
+    // std.debug.print("[{any}] Decompressed to memory\n", .{std.time.milliTimestamp() - debug.startTime});
 
     // Open decompressed archive
     var tar: mtar.mtar_t = std.mem.zeroes(mtar.mtar_t);
