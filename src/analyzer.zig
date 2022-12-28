@@ -1,6 +1,7 @@
 // Analyzes sources and node_modules to find and collect native/pure modules
 // Used in conjunction with the optimizer to enable link-time optimizations
 const std = @import("std");
+const debug = @import("debug.zig");
 
 // TODO: This may be incomplete
 pub const NativeExtensions = [_][]const u8{"*.node", "*.so", "*.so.*", "*.dll", "*.exe", "*.dylib"};
@@ -143,14 +144,14 @@ pub fn parsePackage(allocator: std.mem.Allocator, root: []const u8, path: []cons
     }
 
     var deps = tree.?.root.Object.get("dependencies");
-    var main = tree.?.root.Object.get("main").?.String;
-    var pkgName = tree.?.root.Object.get("name").?.String;
+    var main = tree.?.root.Object.get("main");
+    var pkgName = tree.?.root.Object.get("name");
     var depsArray: [][]const u8 = undefined;
-    var iterator = deps.?.Object.iterator();
 
     if(deps == null or deps.?.Object.count() == 0) {
         depsArray = &.{};
     }else {
+        var iterator = deps.?.Object.iterator();
         var depsArrayList = std.ArrayList([]const u8).init(allocator);
         
         while(iterator.next()) |entry| {
@@ -161,8 +162,8 @@ pub fn parsePackage(allocator: std.mem.Allocator, root: []const u8, path: []cons
     }
 
     return PackageJSON{
-        .name = pkgName,
-        .main = if(main.len == 0) "index.js" else main,
+        .name = if(pkgName != null) pkgName.?.String else "",
+        .main = if(main != null) main.?.String else "index.js",
         .deps =  depsArray
     };
 }
