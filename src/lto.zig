@@ -3,6 +3,7 @@
 const std = @import("std");
 const optimizer = @import("optimizer.zig");
 const analyzer = @import("analyzer.zig");
+const debug = @import("debug.zig");
 
 var allocator: std.mem.Allocator = undefined;
 var root: []const u8 = undefined;
@@ -89,7 +90,7 @@ pub fn LTO(entry: []const u8, format: []const u8) ![]const u8 {
             std.debug.print("{s}\n", .{warning.Text});
         }
     }
-
+    
     std.debug.print("⚡ Bundled and optimized application code ({any} KiB)!\n", .{@divTrunc(result.meta.bundleSize, 1024)});
     return tempDir;
 
@@ -127,7 +128,7 @@ pub fn markExternals(entry: []const u8, format: []const u8) !void {
     // Mark all dynamic and native modules as external
     externals = std.ArrayList([]const u8).init(allocator);
     leafModules = std.ArrayList([]const u8).init(allocator);
-    
+
     // Mark forced external modules
     for(ForcedExternalModules[0..ForcedExternalModules.len]) |module| {
         recursiveMark(module);

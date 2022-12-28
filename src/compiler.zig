@@ -4,9 +4,10 @@ const lz4 = @import("translated/lz4hc.zig");
 const mtar = @import("translated/libmicrotar.zig");
 const builtin = @import("builtin");
 const defaultConfig = @import("config.zig").defaultConfig;
+const debug = @import("debug.zig");
 
 // Performs the build process for a given Bun binary, target, project path and output path
-pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const u8, target: []const u8, project: []const u8, out: []const u8, debug: bool) anyerror![]const u8 {
+pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const u8, target: []const u8, project: []const u8, out: []const u8, isDebug: bool) anyerror![]const u8 {
 
     // Make sure outfile path is not an existing directory
     var isDir = std.fs.openDirAbsolute(out, .{}) catch |e| switch(e) {
@@ -17,15 +18,12 @@ pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const
         isDir.?.close();
         return error.PathIsDirectory;
     }
-
-    // Build archive
-    try buildArchive(allocator, bunPath, project, debug);
-
+    
     // Copy bkg runtime to temporary directory
     try std.fs.copyFileAbsolute(bkgPath, "/tmp/__bkg_build_runtime", .{});
 
-    // Apply compression and add to binary
-    try compressArchive(allocator, "/tmp/__bkg_build_runtime");
+    // Build archive and apply compression
+    try compressArchive(allocator, try buildArchive(allocator, bunPath, project, isDebug), "/tmp/__bkg_build_runtime");
 
     // Rename executable
     try std.fs.renameAbsolute("/tmp/__bkg_build_runtime", out);
@@ -47,16 +45,23 @@ pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const
 }
 
 // Builds a TAR archive given a root directory
-pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []const u8, debug: bool) anyerror!void {
+pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []const u8, isDebug: bool) ![]u8 {
     
     std.debug.print("Building archive...\n", .{});
 
-    // TAR reference
-    var tar: mtar.mtar_t = undefined;
+    // Allocate 512 MiB for storing compressed buffer
+    var buffer = try allocator.alloc(u8, 512 * 1024 * 1024);
 
-    // Open archive for writing
-    _ = mtar.mtar_open(&tar, "/tmp/__bkg_build.tar", "w");
-    defer _ = mtar.mtar_close(&tar);
+    // TAR archive
+    var tar = try allocator.create(mtar.mtar_t);
+    var memStream = try allocator.create(mtar.mtar_mem_stream_t);
+    defer allocator.destroy(tar);
+    defer allocator.destroy(memStream);
+
+    tar.* = std.mem.zeroes(mtar.mtar_t);
+    memStream.* = std.mem.zeroes(mtar.mtar_mem_stream_t);
+    _ = mtar.mtar_init_mem_stream(memStream, buffer.ptr, buffer.len);
+    _ = mtar.mtar_open_mem(tar, memStream);
 
     // Recursively search for files
     var dir = try std.fs.openIterableDirAbsolute(root, .{});
@@ -72,7 +77,7 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
         // Handle directories
         if(entry.kind == .Directory) {
             std.debug.print("Writing directory {s}\n", .{entry.path});
-            _ = mtar.mtar_write_dir_header(&tar, (try allocator.dupe(u8, entry.path)).ptr);
+            _ = mtar.mtar_write_dir_header(tar, (try allocator.dupeZ(u8, entry.path)).ptr);
             continue;
         }
 
@@ -84,18 +89,18 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
             std.debug.print("Could not open {s}: {any}. Skipping...\n", .{entry.path, e});
             continue;
         };
-        const buf: []u8 = try file.readToEndAlloc(allocator, 1024 * 1024 * 1024);
+        const buf: [:0]u8 = try file.readToEndAllocOptions(allocator, 1024 * 1024 * 1024, null, @alignOf(u8), 0);
         const mode = try file.mode();
 
         if(mode & 0o100 == 0o100) {
             std.debug.print("{s} is executable\n", .{entry.path});
         }
 
-        std.debug.print("Writing file {s} with {} bytes\n", .{entry.path, buf.len});
+        std.debug.print("Writing file {s} with {any} bytes\n", .{entry.path, @intCast(c_uint, buf.len)});
 
         // Write buffer to archive
-        _ = mtar.mtar_write_file_header(&tar, (try allocator.dupe(u8, entry.path)).ptr, @intCast(c_uint, buf.len));
-        _ = mtar.mtar_write_data(&tar, buf.ptr, @intCast(c_uint, buf.len));
+        _ = mtar.mtar_write_file_header(tar, (try allocator.dupeZ(u8, entry.path)).ptr, @intCast(c_uint, buf.len));
+        _ = mtar.mtar_write_data(tar, buf.ptr, @intCast(c_uint, buf.len));
 
         // Close & free memory for this file
         allocator.free(buf);
@@ -107,13 +112,13 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
         std.debug.print("Configuration file not found, using default\n", .{});
 
         var newConfig = defaultConfig;
-        if(debug) newConfig.debug = true;
+        if(isDebug) newConfig.debug = true;
 
         var configString = try std.json.stringifyAlloc(allocator, newConfig, .{});
         defer allocator.free(configString);
 
-        _ = mtar.mtar_write_file_header(&tar, "bkg.config.json", @intCast(c_uint, configString.len));
-        _ = mtar.mtar_write_data(&tar, configString.ptr, @intCast(c_uint, configString.len));
+        _ = mtar.mtar_write_file_header(tar, "bkg.config.json", @intCast(c_uint, configString.len));
+        _ = mtar.mtar_write_data(tar, configString.ptr, @intCast(c_uint, configString.len));
     }
     
     // Add Bun binary to archive
@@ -122,33 +127,27 @@ pub fn buildArchive(allocator: std.mem.Allocator, bun_path: []const u8, root: []
         var bun = try std.fs.openFileAbsolute(bun_path, .{});
         const bunBuf: []u8 = try bun.readToEndAlloc(allocator, 256 * 1024 * 1024);
 
-        _ = mtar.mtar_write_file_header(&tar, "bkg_bun", @intCast(c_uint, bunBuf.len));
-        _ = mtar.mtar_write_data(&tar, bunBuf.ptr, @intCast(c_uint, bunBuf.len));
+        _ = mtar.mtar_write_file_header(tar, "bkg_bun", @intCast(c_uint, bunBuf.len));
+        _ = mtar.mtar_write_data(tar, bunBuf.ptr, @intCast(c_uint, bunBuf.len));
 
         allocator.free(bunBuf);
         bun.close();
     }
 
     // Finalize the archive
-    _ = mtar.mtar_finalize(&tar);
+    _ = mtar.mtar_finalize(tar);
+    _ = mtar.mtar_close(tar);
 
     std.debug.print("Finalized archive\n", .{});
+
+    return buffer[0..memStream.pos];
 
 }
 
 // Applies LZ4 compression on given TAR archive
-pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerror!void {
+pub fn compressArchive(allocator: std.mem.Allocator, buf: []u8, target: []const u8) !void {
     
     std.debug.print("Compressing archive...\n", .{});
-
-    // Open archive and read it's contents
-    var archive = try std.fs.openFileAbsolute("/tmp/__bkg_build.tar", .{});
-    const buf: []u8 = try archive.readToEndAlloc(allocator, 5 * 1024 * 1024 * 1024); // We assume the archive is <= 5 GiB
-    defer allocator.free(buf);
-
-    // Delete temporary archive file
-    archive.close();
-    try std.fs.deleteFileAbsolute("/tmp/__bkg_build.tar");
 
     // Allocate 512 MiB buffer for storing compressed archive
     var compressed: []u8 = try allocator.alloc(u8, 512 * 1024 * 1024);
@@ -184,20 +183,26 @@ pub fn compressArchive(allocator: std.mem.Allocator, target: []const u8) anyerro
     // Write CRC32 hash + compressed size (10 + 10) bytes at the end
     {
         std.debug.print("Finalizing binary...\n", .{});
-        var compSizeBuffer: []u8 = try allocator.alloc(u8, 10);
-        var hashBuffer: []u8 = try allocator.alloc(u8, 10);
+        var compSizeBuffer: []u8 = try std.fmt.allocPrint(allocator, "{d}", .{compSize});
+        var hashBuffer: []u8 = try std.fmt.allocPrint(allocator, "{d}", .{hash});
+        var compSizeBuf10 = try allocator.alloc(u8, 10);
         defer allocator.free(compSizeBuffer);
         defer allocator.free(hashBuffer);
 
-        var compSizeBufferStream = std.io.fixedBufferStream(compSizeBuffer);
-        var hashBufferStream = std.io.fixedBufferStream(hashBuffer);
-        try std.fmt.format(compSizeBufferStream.writer(), "{}", .{compSize});
-        try std.fmt.format(hashBufferStream.writer(), "{}", .{hash});
+        // Fill empty bytes of compSizeBuf with 0s
+        for(compSizeBuf10[0..10]) |_, i| {
+            if(i >= compSizeBuffer.len) { compSizeBuf10[i] = 0; }
+            else { compSizeBuf10[i] = compSizeBuffer[i]; }
+        }
 
         _ = try file.writeAll(hashBuffer);
-        _ = try file.writeAll(compSizeBuffer);
+        _ = try file.writeAll(compSizeBuf10);
     }
+
     std.debug.print("Done\n", .{});
+
+    // Free compressed buffer
+    allocator.free(buf);
 
 }
 
@@ -224,47 +229,3 @@ pub fn getHostTargetString(allocator: std.mem.Allocator) ![]const u8 {
     return target;
 
 }
-
-// TODO: Stream tar buffer directly to lz4 in memory
-// Will reduce a few syscalls, and make compiling considerably faster
-
-// Allocate a 200 MiB buffer for the stream
-// var tarBuffer = try allocator.alloc(u8, 200 * 1024 * 1024);
-// //defer allocator.free(tarBuffer);
-// var tar: *mtar.mtar_t = try allocator.create(mtar.mtar_t);
-// //defer allocator.destroy(tar);
-// // TAR archive
-// tar.* = mtar.mtar_t{
-//     .write = writeCallback,
-//     .stream = &tarBuffer,
-//     .read = null,
-//     .seek = null,
-//     .close = null,
-//     .pos = 0,
-//     .last_header = 0,
-//     .remaining_data = 0,
-// };
-// pub fn writeCallback(tar: [*c]mtar.mtar_t, data: ?*const anyopaque, size: c_uint) callconv(.C) c_int {
-//     _ = tar;
-//     _ = data;
-//     _ = size;
-    
-//     // Archived buffer
-//     var ptr = data orelse @panic("Null buffer");
-//     const buffer: *const []u8 = @ptrCast(*const []u8, @alignCast(@alignOf([]const u8), ptr));
-//     _ = buffer;
-    
-//     // Stream buffer
-//     var streamPtr = tar.*.stream orelse @panic("Null buffer");
-//     var stream: *[]u8 = @ptrCast(*[]u8, @alignCast(@alignOf([]u8), streamPtr));
-
-//     var fbs = std.io.fixedBufferStream(stream.*);
-//     var written = fbs.write(buffer.*) catch |e| {
-//         std.debug.print("error: {}\n", .{e});
-//         @panic("error");
-//     };
-//     _ = written;
-//     std.debug.print("{}\n", .{written});
-
-//     return mtar.MTAR_ESUCCESS;
-// }

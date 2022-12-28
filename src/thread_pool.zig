@@ -71,7 +71,7 @@ pub const ExtractData = struct {
 /// The user provides a `callback` which is invoked when the *Task can run on a thread.
 pub const Task = struct {
     node: Node = .{},
-    callback: fn (*Task) void,
+    callback: *const fn (*Task) void,
     data: *ExtractData
 };
 

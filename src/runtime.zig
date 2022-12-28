@@ -36,12 +36,11 @@ pub fn parseBinary(allocator: std.mem.Allocator, path: []const u8) anyerror!Pars
     const buf: []const u8 = try file.readToEndAlloc(allocator, 1024);
     defer allocator.free(buf);
 
-    var crcBuf = buf[0..10];
-    var compSizeBuf = buf[10..20];
+    var crcBuf: []const u8 = buf[0..10];
+    var compSizeBuf: []const u8 = buf[10..20];
 
     // Parse into usize
     var nullIndex = std.mem.indexOfScalar(u8, compSizeBuf, 0) orelse 10;
-    var crcNullIndex = std.mem.indexOfScalar(u8, crcBuf, 0) orelse 10;
 
     //var crc32 = try allocator.dupe(u8, crcBuf);
     var compSize = std.fmt.parseInt(usize, compSizeBuf[0..nullIndex], 0) catch {
@@ -50,7 +49,7 @@ pub fn parseBinary(allocator: std.mem.Allocator, path: []const u8) anyerror!Pars
 
     return ParseResult{
         .compressed = compSize,
-        .hash = try allocator.dupe(u8, crcBuf[0..crcNullIndex])
+        .hash = try allocator.dupe(u8, crcBuf[0..10])
     };
 
 }
@@ -104,7 +103,7 @@ fn extractCallback(op: *threadpool.Task) void {
 // and then de-archives it to a temporary location in the filesystem
 // We prefer OS temp directory because it's always world writeable.
 // However, this may change.
-pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []const u8, parsed: ParseResult) anyerror!void {
+pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []const u8, parsed: ParseResult) !void {
 
     alloc = allocator;
     extractRoot = root;
@@ -130,12 +129,15 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     // Perform LZ4 decompression
     var result = lz4.LZ4_decompress_safe(buf[0..parsed.compressed].ptr, decompressed.ptr, @intCast(c_int, parsed.compressed), 1024 * 1024 * 1024);
 
-    // std.debug.print("[{any}] Decompressed to memory\n", .{std.time.milliTimestamp() - debug.startTime});
+    //std.debug.print("[{any}] Decompressed {any} bytes to memory\n", .{std.time.milliTimestamp() - debug.startTime, result});
 
     // Open decompressed archive
     var tar: mtar.mtar_t = std.mem.zeroes(mtar.mtar_t);
+    var memStream: mtar.mtar_mem_stream_t = std.mem.zeroes(mtar.mtar_mem_stream_t);
     var header: *mtar.mtar_header_t = try allocator.create(mtar.mtar_header_t);
-    _ = mtar_open_mem(&tar, &decompressed[0..@intCast(usize, result)]);
+
+    _ = mtar.mtar_init_mem_stream(&memStream, decompressed[0..@intCast(usize, result)].ptr, @intCast(usize, result));
+    _ = mtar.mtar_open_mem(&tar, &memStream);
 
     // Load configuration file before everything else
     _ = mtar.mtar_find(&tar, "bkg.config.json", header);
@@ -160,7 +162,6 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     if(debug.debug) debug.print("Initialized thread pool using {any} threads", .{threads});
 
     // Initial no-op task
-    var initTask = try allocator.create(threadpool.Task);
     var initData = threadpool.ExtractData{
         .name = null,
         .buffer = undefined,
@@ -169,10 +170,11 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
         .header = undefined,
         .tar = undefined
     };
-    initTask.* = threadpool.Task{
+    var initTaskStruct = threadpool.Task{
         .callback = extractCallback,
         .data = &initData
     };
+    var initTask = &initTaskStruct;
 
     //var batch = try allocator.create(threadpool.Batch);
     var batch = threadpool.Batch.from(initTask);
@@ -269,9 +271,11 @@ pub fn extractArchiveSingleThreaded(allocator: std.mem.Allocator, target: []cons
 
     // Open decompressed archive
     var tar: mtar.mtar_t = std.mem.zeroes(mtar.mtar_t);
+    var memStream: mtar.mtar_mem_stream_t = std.mem.zeroes(mtar.mtar_mem_stream_t);
     var header: *mtar.mtar_header_t = try allocator.create(mtar.mtar_header_t);
-    _ = root;
-    _ = mtar_open_mem(&tar, &decompressed[0..@intCast(usize, result)]);
+
+    _ = mtar.mtar_init_mem_stream(&memStream, decompressed[0..@intCast(usize, result)].ptr, @intCast(usize, result));
+    _ = mtar.mtar_open_mem(&tar, &memStream);
     
     // Iterate through the archive
     while (mtar.mtar_read_header(&tar, header) != mtar.MTAR_ENULLRECORD) {
@@ -369,59 +373,5 @@ pub fn exec(a: std.mem.Allocator, cwd: []const u8, argv: []const []const u8) !vo
             return error.CommandFailed;
         },
     }
-
-}
-
-// Callback functions required by microtar
-// Streams decompressed LZ4 buffer directly to mtar in memory
-
-fn mtar_mem_write(tar: [*c]mtar.mtar_t, data: ?*const anyopaque, size: c_uint) callconv(.C) c_int {
-    _ = tar;
-    _ = data;
-    _ = size;
-    return mtar.MTAR_EWRITEFAIL;
-}
-
-// mem_read should supply data to microtar
-fn mtar_mem_read(tar: ?*mtar.mtar_t, data: ?*anyopaque, size: c_uint) callconv(.C) c_int {
-    
-    // TODO: Return error on null pointer?
-    const dataPtr = data orelse return mtar.MTAR_ENULLRECORD;
-    const thisTar = tar orelse return mtar.MTAR_EFAILURE;
-
-    const buffer = @ptrCast([*]u8, @alignCast(@alignOf(u8), dataPtr));
-    const streamPtr = thisTar.stream orelse return mtar.MTAR_ENULLRECORD;
-    const streamBuffer: *[]u8 = @ptrCast(*[]u8, @alignCast(@alignOf(*[]u8), streamPtr));
-
-    const end = if (streamBuffer.*.len < (thisTar.pos + size)) streamBuffer.*.len else (thisTar.pos + size);
-    for (streamBuffer.*[thisTar.pos..end]) |b, i| buffer[i] = b;
-    //@memcpy(buffer, streamBuffer.*[thisTar.pos..streamBuffer.*.len].ptr, size);
-    //std.mem.copy(u8, buffer.*, streamBuffer.*[tar.?.pos..streamBuffer.len]);
-    
-    return mtar.MTAR_ESUCCESS;
-
-}
-
-fn mtar_mem_seek(tar: ?*mtar.mtar_t, offset: c_uint) callconv(.C) c_int {
-    _ = tar;
-    _ = offset;
-    return mtar.MTAR_ESUCCESS;
-}
-
-fn mtar_mem_close(tar: ?*mtar.mtar_t) callconv(.C) c_int {
-    _ = tar;
-    return mtar.MTAR_ESUCCESS;
-}
-
-fn mtar_open_mem(tar: *mtar.mtar_t, data: *[]u8) c_int {
-
-    tar.write = mtar_mem_write;
-    tar.read = mtar_mem_read;
-    tar.seek = mtar_mem_seek;
-    tar.close = mtar_mem_close;
-    tar.stream = data;
-
-    // Return ok
-    return mtar.MTAR_ESUCCESS;
 
 }

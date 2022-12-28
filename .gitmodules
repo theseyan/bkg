@@ -1,9 +1,6 @@
 [submodule "deps/lz4"]
 	path = deps/lz4
 	url = https://github.com/lz4/lz4
-[submodule "deps/microtar"]
-	path = deps/microtar
-	url = https://github.com/rxi/microtar
 [submodule "deps/known-folders"]
 	path = deps/known-folders
 	url = https://github.com/ziglibs/known-folders
@@ -22,3 +19,6 @@
 [submodule "deps/zfetch"]
 	path = deps/zfetch
 	url = https://github.com/theseyan/zfetch
+[submodule "deps/microtar"]
+	path = deps/microtar
+	url = https://github.com/Inndy/microtar

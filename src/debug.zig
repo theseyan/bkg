@@ -11,8 +11,6 @@ var allocator: std.mem.Allocator = undefined;
 
 // Prints a debug message
 pub fn print(comptime msg: []const u8, args: anytype) void {
-    _ = msg;
-    _ = args;
 
     std.debug.print("[bkg] " ++ msg ++ "\n", args);
 

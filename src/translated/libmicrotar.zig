@@ -626,7 +626,15 @@ pub const struct_mtar_t = extern struct {
     remaining_data: c_uint,
     last_header: c_uint,
 };
+pub const struct_mtar_mem_stream_t = extern struct {
+    data: [*c]u8,
+    size: usize,
+    pos: usize,
+};
+pub const mtar_mem_stream_t = struct_mtar_mem_stream_t;
 pub extern fn mtar_strerror(err: c_int) [*c]const u8;
+pub extern fn mtar_init_mem_stream(mem: [*c]mtar_mem_stream_t, buff: ?*anyopaque, size: usize) c_int;
+pub extern fn mtar_open_mem(tar: [*c]mtar_t, mem: [*c]mtar_mem_stream_t) c_int;
 pub extern fn mtar_open(tar: [*c]mtar_t, filename: [*c]const u8, mode: [*c]const u8) c_int;
 pub extern fn mtar_close(tar: [*c]mtar_t) c_int;
 pub extern fn mtar_seek(tar: [*c]mtar_t, pos: c_uint) c_int;
@@ -688,11 +696,11 @@ pub const __attribute_copy__ = @compileError("unable to translate C expr: unexpe
 pub const __LDBL_REDIR_DECL = @compileError("unable to translate C expr: unexpected token 'Eof'"); // /usr/include/x86_64-linux-gnu/sys/cdefs.h:479:10
 pub const __glibc_macro_warning1 = @compileError("unable to translate macro: undefined identifier `_Pragma`"); // /usr/include/x86_64-linux-gnu/sys/cdefs.h:493:10
 pub const __glibc_macro_warning = @compileError("unable to translate macro: undefined identifier `GCC`"); // /usr/include/x86_64-linux-gnu/sys/cdefs.h:494:10
-pub const va_start = @compileError("unable to translate macro: undefined identifier `__builtin_va_start`"); // /home/theseyan/zig-0.11/lib/include/stdarg.h:17:9
-pub const va_end = @compileError("unable to translate macro: undefined identifier `__builtin_va_end`"); // /home/theseyan/zig-0.11/lib/include/stdarg.h:18:9
-pub const va_arg = @compileError("unable to translate macro: undefined identifier `__builtin_va_arg`"); // /home/theseyan/zig-0.11/lib/include/stdarg.h:19:9
-pub const __va_copy = @compileError("unable to translate macro: undefined identifier `__builtin_va_copy`"); // /home/theseyan/zig-0.11/lib/include/stdarg.h:24:9
-pub const va_copy = @compileError("unable to translate macro: undefined identifier `__builtin_va_copy`"); // /home/theseyan/zig-0.11/lib/include/stdarg.h:27:9
+pub const va_start = @compileError("unable to translate macro: undefined identifier `__builtin_va_start`"); // /home/theseyan/zig/lib/include/stdarg.h:17:9
+pub const va_end = @compileError("unable to translate macro: undefined identifier `__builtin_va_end`"); // /home/theseyan/zig/lib/include/stdarg.h:18:9
+pub const va_arg = @compileError("unable to translate macro: undefined identifier `__builtin_va_arg`"); // /home/theseyan/zig/lib/include/stdarg.h:19:9
+pub const __va_copy = @compileError("unable to translate macro: undefined identifier `__builtin_va_copy`"); // /home/theseyan/zig/lib/include/stdarg.h:24:9
+pub const va_copy = @compileError("unable to translate macro: undefined identifier `__builtin_va_copy`"); // /home/theseyan/zig/lib/include/stdarg.h:27:9
 pub const __STD_TYPE = @compileError("unable to translate C expr: unexpected token 'typedef'"); // /usr/include/x86_64-linux-gnu/bits/types.h:137:10
 pub const __FSID_T_TYPE = @compileError("unable to translate macro: undefined identifier `__val`"); // /usr/include/x86_64-linux-gnu/bits/typesizes.h:72:9
 pub const __getc_unlocked_body = @compileError("TODO postfix inc/dec expr"); // /usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h:102:9
@@ -1609,6 +1617,7 @@ pub const __have_pthread_attr_t = @as(c_int, 1);
 pub const _ALLOCA_H = @as(c_int, 1);
 pub const __COMPAR_FN_T = "";
 pub const MTAR_VERSION = "0.1.0";
+pub const MTAR_NULL_BLOCKSIZE = @as(c_int, 16);
 pub const __va_list_tag = struct___va_list_tag;
 pub const _G_fpos_t = struct__G_fpos_t;
 pub const _G_fpos64_t = struct__G_fpos64_t;
