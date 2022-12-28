@@ -41,9 +41,9 @@ pub const BuildResult = struct {
 
 pub const OptimizeResult = struct {
     status: enum { Success, Failure, Warning },
-    errors: []OptimizerMessage = .{},
-    warnings: []OptimizerMessage = .{},
-    inputs: [][]const u8 = .{},
+    errors: []OptimizerMessage = &.{},
+    warnings: []OptimizerMessage = &.{},
+    inputs: [][]const u8 = &.{},
     meta: struct {
         bundleSize: i64 = 0
     }
@@ -151,7 +151,7 @@ pub fn optimize(allocator: std.mem.Allocator, entry: []const u8, out: []const u8
             try inputsArrayList.append(item.key_ptr.*);
         }
 
-        optimizeResult.inputs = inputsArrayList.toOwnedSlice();
+        optimizeResult.inputs = try inputsArrayList.toOwnedSlice();
     }
 
     // Free parsed struct

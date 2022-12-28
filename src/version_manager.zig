@@ -4,7 +4,7 @@ const std = @import("std");
 const json = std.json;
 const knownFolders = @import("known-folders");
 const zip = @import("translated/libzip.zig");
-const zfetch = @import("zfetch");
+const zelda = @import("zelda");
 
 // GitHub API URL for fetching latest Bun & bkg releases
 const bunLatestAPI = "https://api.github.com/repos/oven-sh/bun/releases/latest";
@@ -35,7 +35,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
     };
 
     // Initialize zfetch
-    try zfetch.init();
+    //try zfetch.init();
 
     // Save pointer to allocator
     vmAllocator = &allocator;
@@ -45,50 +45,53 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
 // De-initializes Version Manager
 pub fn deinit() void {
 
-    zfetch.deinit();
+    //zfetch.deinit();
 
 }
 
 // Custom downloader that respects HTTP 3xx redirects
 pub fn download(url: []const u8, path: []const u8) !usize {
 
-    // Init headers and request
-    var headers = zfetch.Headers.init(vmAllocator.*);
-    defer headers.deinit();
-    var req = try zfetch.Request.init(vmAllocator.*, url, null);
-    defer req.deinit();
+    _ = url;
+    _ = path;
+    return error.Zelda;
+    // // Init headers and request
+    // var headers = zfetch.Headers.init(vmAllocator.*);
+    // defer headers.deinit();
+    // var req = try zfetch.Request.init(vmAllocator.*, url, null);
+    // defer req.deinit();
 
-    // Perform request
-    try headers.appendValue("Accept", "application/octet-stream");
-    try headers.appendValue("User-Agent", "theseyan/bkg");
-    try req.do(.GET, headers, null);
+    // // Perform request
+    // try headers.appendValue("Accept", "application/octet-stream");
+    // try headers.appendValue("User-Agent", "theseyan/bkg");
+    // try req.do(.GET, headers, null);
 
-    // Follow 3xx redirects
-    if (req.status.code > 300 and req.status.code < 400) {
-        var locationHeader = req.headers.search("Location");
-        return download(locationHeader.?.value, path);
-    }
-    // If status is neither 200 or 3xx
-    else if(req.status.code != 200) {
-        return error.DownloadFailed;
-    }
+    // // Follow 3xx redirects
+    // if (req.status.code > 300 and req.status.code < 400) {
+    //     var locationHeader = req.headers.search("Location");
+    //     return download(locationHeader.?.value, path);
+    // }
+    // // If status is neither 200 or 3xx
+    // else if(req.status.code != 200) {
+    //     return error.DownloadFailed;
+    // }
 
-    // Create file on disk
-    const file = try std.fs.createFileAbsolute(path, .{});
-    const writer = file.writer();
-    const reader = req.reader();
+    // // Create file on disk
+    // const file = try std.fs.createFileAbsolute(path, .{});
+    // const writer = file.writer();
+    // const reader = req.reader();
 
-    // Write download buffer to file
-    var size: usize = 0;
-    var buf: [65535]u8 = undefined;
-    while (true) {
-        const read = try reader.read(&buf);
-        if (read == 0) break;
-        size += read;
-        try writer.writeAll(buf[0..read]);
-    }
+    // // Write download buffer to file
+    // var size: usize = 0;
+    // var buf: [65535]u8 = undefined;
+    // while (true) {
+    //     const read = try reader.read(&buf);
+    //     if (read == 0) break;
+    //     size += read;
+    //     try writer.writeAll(buf[0..read]);
+    // }
 
-    return size;
+    // return size;
 
 }
 
@@ -96,32 +99,34 @@ pub fn download(url: []const u8, path: []const u8) !usize {
 // Returns a buffer that must be freed manually
 pub fn fetch(url: []const u8) ![]const u8 {
 
-    // Init headers and request
-    var headers = zfetch.Headers.init(vmAllocator.*);
-    defer headers.deinit();
-    var req = try zfetch.Request.init(vmAllocator.*, url, null);
-    defer req.deinit();
+    _ = url;
+    return error.Zelda;
+    // // Init headers and request
+    // var headers = zfetch.Headers.init(vmAllocator.*);
+    // defer headers.deinit();
+    // var req = try zfetch.Request.init(vmAllocator.*, url, null);
+    // defer req.deinit();
 
-    // Perform request
-    try headers.appendValue("Accept", "*/*");
-    try headers.appendValue("User-Agent", "theseyan/bkg");
-    try req.do(.GET, headers, null);
+    // // Perform request
+    // try headers.appendValue("Accept", "*/*");
+    // try headers.appendValue("User-Agent", "theseyan/bkg");
+    // try req.do(.GET, headers, null);
 
-    // Follow 3xx redirects
-    if (req.status.code > 300 and req.status.code < 400) {
-        var locationHeader = req.headers.search("Location");
-        return fetch(locationHeader.?.value);
-    }
-    // If status is neither 200 or 3xx
-    else if(req.status.code != 200) {
-        return error.FetchFailed;
-    }
+    // // Follow 3xx redirects
+    // if (req.status.code > 300 and req.status.code < 400) {
+    //     var locationHeader = req.headers.search("Location");
+    //     return fetch(locationHeader.?.value);
+    // }
+    // // If status is neither 200 or 3xx
+    // else if(req.status.code != 200) {
+    //     return error.FetchFailed;
+    // }
 
-    // Read response buffer
-    const reader = req.reader();
-    const buffer = try reader.readAllAlloc(vmAllocator.*, 8 * 1024 * 1024); // Response body should not exceed 8 MiB
+    // // Read response buffer
+    // const reader = req.reader();
+    // const buffer = try reader.readAllAlloc(vmAllocator.*, 8 * 1024 * 1024); // Response body should not exceed 8 MiB
 
-    return buffer;
+    // return buffer;
 
 }
 

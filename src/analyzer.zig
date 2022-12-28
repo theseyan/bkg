@@ -49,7 +49,7 @@ pub fn analyze(allocator: std.mem.Allocator, root: []const u8) !*std.ArrayList(M
                 .path = try allocator.dupe(u8, path),
                 .name = try allocator.dupe(u8, name),
                 .main = try allocator.dupe(u8, parsed.main),
-                .deps = deps.toOwnedSlice()
+                .deps = try deps.toOwnedSlice()
             });
         }
     }
@@ -78,7 +78,7 @@ pub fn analyze(allocator: std.mem.Allocator, root: []const u8) !*std.ArrayList(M
             .path = module.path,
             .name = module.name,
             .main = module.main,
-            .deps = depsArrayList.toOwnedSlice()
+            .deps = try depsArrayList.toOwnedSlice()
         };
 
         try modules.replaceRange(i, 1, &.{replaceModule});
@@ -157,7 +157,7 @@ pub fn parsePackage(allocator: std.mem.Allocator, root: []const u8, path: []cons
             try depsArrayList.append(entry.key_ptr.*);
         }
 
-        depsArray = depsArrayList.toOwnedSlice();
+        depsArray = try depsArrayList.toOwnedSlice();
     }
 
     return PackageJSON{

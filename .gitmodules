@@ -13,9 +13,9 @@
 [submodule "deps/zig-clap"]
 	path = deps/zig-clap
 	url = https://github.com/Hejsil/zig-clap
-[submodule "deps/zfetch"]
-	path = deps/zfetch
-	url = https://github.com/truemedian/zfetch
 [submodule "deps/bOptimizer"]
 	path = deps/bOptimizer
 	url = https://github.com/theseyan/bOptimizer
+[submodule "deps/zelda"]
+	path = deps/zelda
+	url = https://github.com/haze/zelda

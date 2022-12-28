@@ -1,5 +1,5 @@
 const std = @import("std");
-const zfetch = @import("deps/zfetch/build.zig");
+const zelda = @import("deps/zelda/build.zig");
 
 pub fn build(b: *std.build.Builder) !void {
     const target = b.standardTargetOptions(.{});
@@ -9,7 +9,7 @@ pub fn build(b: *std.build.Builder) !void {
 
     // Strip debug symbols by default
     // Should be disabled during development/debugging
-    exe.strip = true;
+    exe.strip = false;
 
     // Force stage1 compiler
     //exe.use_stage1 = true;
@@ -22,10 +22,10 @@ pub fn build(b: *std.build.Builder) !void {
     }else if(target.getOs().tag == .linux and target.getCpu().arch == .aarch64) {
         exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-aarch64-linux.a");
     }else if(target.getOs().tag == .macos and target.getCpu().arch == .x86_64) {
-        // b.sysroot = "/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root";
-        // exe.addLibraryPath("/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root/usr/lib");
-        // exe.addFrameworkPath("/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root/System/Library/Frameworks");
-        // exe.linkFramework("CoreFoundation");
+        b.sysroot = "/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root";
+        exe.addLibraryPath("/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root/usr/lib");
+        exe.addFrameworkPath("/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root/System/Library/Frameworks");
+        exe.linkFramework("CoreFoundation");
         exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-x86_64-macos.a");
     }else if(target.getOs().tag == .macos and target.getCpu().arch == .aarch64) {
         exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-aarch64-macos.a");
@@ -44,8 +44,8 @@ pub fn build(b: *std.build.Builder) !void {
     // Link zig-clap library
     exe.addPackagePath("clap", "deps/zig-clap/clap.zig");
 
-    // Link zfetch
-    exe.addPackage(try zfetch.getPackage(b));
+    // Link zelda
+    try zelda.link(b, exe, target, mode, true);
 
     // Link known-folders
     exe.addPackagePath("known-folders", "deps/known-folders/known-folders.zig");

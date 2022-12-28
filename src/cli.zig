@@ -110,7 +110,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
             while(iterator.next()) |glob| {
                 try list.append(glob);
             }
-            includes = list.toOwnedSlice();
+            includes = try list.toOwnedSlice();
         }else {
             includes = config.get().lto.?.includes;
         }
