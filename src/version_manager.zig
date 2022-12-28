@@ -12,7 +12,7 @@ const bunLatestAPI = "https://api.github.com/repos/oven-sh/bun/releases/latest";
 const bkgLatestAPI = "https://api.github.com/repos/theseyan/bkg/releases/latest";
 
 // Holds the allocator
-var vmAllocator: *const std.mem.Allocator = undefined;
+var vmAllocator: std.mem.Allocator = undefined;
 
 // We only need tag_name from API JSON response
 pub const APIReleaseTag = struct{
@@ -24,11 +24,11 @@ pub const APIReleaseTag = struct{
 pub fn init(allocator: std.mem.Allocator) anyerror!void {
 
     // Save pointer to allocator
-    vmAllocator = &allocator;
+    vmAllocator = allocator;
 
     // .bkg directory present in home directory
-    const homeDir = (try knownFolders.getPath(vmAllocator.*, knownFolders.KnownFolder.home)) orelse @panic("Failed to get path to home directory.");
-    const bkgDir = try std.mem.concat(vmAllocator.*, u8, &.{homeDir, "/.bkg"});
+    const homeDir = (try knownFolders.getPath(vmAllocator, knownFolders.KnownFolder.home)) orelse @panic("Failed to get path to home directory.");
+    const bkgDir = try std.mem.concat(vmAllocator, u8, &.{homeDir, "/.bkg"});
 
     // Check if bkg root exists
     _ = std.fs.openDirAbsolute(bkgDir, .{}) catch |e| {
@@ -54,9 +54,9 @@ pub fn deinit() void {
 pub fn download(url: []const u8, path: []const u8) !usize {
 
     // Init headers and request
-    var headers = zfetch.Headers.init(vmAllocator.*);
+    var headers = zfetch.Headers.init(vmAllocator);
     defer headers.deinit();
-    var req = try zfetch.Request.init(vmAllocator.*, url, null);
+    var req = try zfetch.Request.init(vmAllocator, url, null);
     defer req.deinit();
 
     // Perform request
@@ -98,9 +98,9 @@ pub fn download(url: []const u8, path: []const u8) !usize {
 pub fn fetch(url: []const u8) ![]const u8 {
 
     // Init headers and request
-    var headers = zfetch.Headers.init(vmAllocator.*);
+    var headers = zfetch.Headers.init(vmAllocator);
     defer headers.deinit();
-    var req = try zfetch.Request.init(vmAllocator.*, url, null);
+    var req = try zfetch.Request.init(vmAllocator, url, null);
     defer req.deinit();
 
     // Perform request
@@ -120,7 +120,7 @@ pub fn fetch(url: []const u8) ![]const u8 {
 
     // Read response buffer
     const reader = req.reader();
-    const buffer = try reader.readAllAlloc(vmAllocator.*, 8 * 1024 * 1024); // Response body should not exceed 8 MiB
+    const buffer = try reader.readAllAlloc(vmAllocator, 8 * 1024 * 1024); // Response body should not exceed 8 MiB
 
     return buffer;
 
@@ -131,12 +131,12 @@ pub fn fetch(url: []const u8) ![]const u8 {
 pub fn getLatestBunVersion() anyerror![]const u8 {
 
     var response_buffer = try fetch(bunLatestAPI);
-    defer vmAllocator.*.free(response_buffer);
+    defer vmAllocator.free(response_buffer);
 
     // Parse JSON
     var config: APIReleaseTag = x: {
         var stream = json.TokenStream.init(response_buffer);
-        const res = json.parse(APIReleaseTag, &stream, .{.allocator = vmAllocator.*, .ignore_unknown_fields = true});
+        const res = json.parse(APIReleaseTag, &stream, .{.allocator = vmAllocator, .ignore_unknown_fields = true});
         break :x res catch |e| {
             std.debug.print("Error while parsing JSON: {}\n", .{e});
             return error.ErrorParsingJSON;
@@ -155,17 +155,17 @@ pub fn downloadBun(version: []const u8, arch: []const u8, specifier: ?[]const u8
     std.debug.print("Downloading {s} for target {s}...\n", .{version, arch});
 
     // Construct URL to bun release
-    const postfix = if(specifier == null) try getBunTargetString(arch) else try std.mem.concat(vmAllocator.*, u8, &.{try getBunTargetString(arch), "-", specifier.?});
-    var releaseUrl = try std.mem.concat(vmAllocator.*, u8, &.{"https://github.com/oven-sh/bun/releases/download/", version, "/bun-", postfix, ".zip"});
+    const postfix = if(specifier == null) try getBunTargetString(arch) else try std.mem.concat(vmAllocator, u8, &.{try getBunTargetString(arch), "-", specifier.?});
+    var releaseUrl = try std.mem.concat(vmAllocator, u8, &.{"https://github.com/oven-sh/bun/releases/download/", version, "/bun-", postfix, ".zip"});
 
-    const homeDir = (try knownFolders.getPath(vmAllocator.*, knownFolders.KnownFolder.home)) orelse @panic("Failed to get path to home directory.");
-    const runtimeDir = try std.mem.concat(vmAllocator.*, u8, &.{homeDir, "/.bkg/runtime"});
+    const homeDir = (try knownFolders.getPath(vmAllocator, knownFolders.KnownFolder.home)) orelse @panic("Failed to get path to home directory.");
+    const runtimeDir = try std.mem.concat(vmAllocator, u8, &.{homeDir, "/.bkg/runtime"});
 
     // Formatted as {tag}-{target}/bun-{target}/bun
     // example: bun-v0.1.8-linux-x64/bun-x64-linux/bun
-    const bunPath = try std.mem.concat(vmAllocator.*, u8, &.{homeDir, "/.bkg/runtime/", version, "-", postfix, "/bun-", postfix, "/bun"});
-    const bunZipPath = try std.mem.concatWithSentinel(vmAllocator.*, u8, &.{homeDir, "/.bkg/runtime/", version, "-", postfix, ".zip"}, 0);
-    const extractDir = try std.mem.concatWithSentinel(vmAllocator.*, u8, &.{runtimeDir, "/", version, "-", postfix}, 0);
+    const bunPath = try std.mem.concat(vmAllocator, u8, &.{homeDir, "/.bkg/runtime/", version, "-", postfix, "/bun-", postfix, "/bun"});
+    const bunZipPath = try std.mem.concatWithSentinel(vmAllocator, u8, &.{homeDir, "/.bkg/runtime/", version, "-", postfix, ".zip"}, 0);
+    const extractDir = try std.mem.concatWithSentinel(vmAllocator, u8, &.{runtimeDir, "/", version, "-", postfix}, 0);
 
     // Create /runtime directory if it doesn't already exist
     _ = std.fs.openDirAbsolute(runtimeDir, .{}) catch |e| {
@@ -206,12 +206,12 @@ pub fn downloadBun(version: []const u8, arch: []const u8, specifier: ?[]const u8
 pub fn getLatestBkgVersion() anyerror![]const u8 {
     
     var response_buffer = try fetch(bkgLatestAPI);
-    defer vmAllocator.*.free(response_buffer);
+    defer vmAllocator.free(response_buffer);
 
     // Parse JSON
     var config: APIReleaseTag = x: {
         var stream = json.TokenStream.init(response_buffer);
-        const res = json.parse(APIReleaseTag, &stream, .{.allocator = vmAllocator.*, .ignore_unknown_fields = true});
+        const res = json.parse(APIReleaseTag, &stream, .{.allocator = vmAllocator, .ignore_unknown_fields = true});
         break :x res catch |e| {
             std.debug.print("Error while parsing JSON: {}\n", .{e});
             return error.ErrorParsingJSON;
@@ -227,21 +227,21 @@ pub fn getLatestBkgVersion() anyerror![]const u8 {
 // example: v0.0.1, aarch64-linux
 pub fn downloadRuntime(version: []const u8, arch: []const u8) anyerror![]const u8 {
 
-    const homePath = (try knownFolders.getPath(vmAllocator.*, knownFolders.KnownFolder.home)) orelse return error.CannotGetHomePath;
-    const runtimePath = try std.mem.concat(vmAllocator.*, u8, &.{homePath, "/.bkg/bkg_runtime/", arch, "/bkg_runtime-", version});
-    const runtimeDir = try std.mem.concat(vmAllocator.*, u8, &.{homePath, "/.bkg/bkg_runtime"});
+    const homePath = (try knownFolders.getPath(vmAllocator, knownFolders.KnownFolder.home)) orelse return error.CannotGetHomePath;
+    const runtimePath = try std.mem.concat(vmAllocator, u8, &.{homePath, "/.bkg/bkg_runtime/", arch, "/bkg_runtime-", version});
+    const runtimeDir = try std.mem.concat(vmAllocator, u8, &.{homePath, "/.bkg/bkg_runtime"});
 
     std.debug.print("Downloading bkg runtime {s} for target {s}...\n", .{version, arch});
 
     // Construct URL to download release
-    var releaseUrl = try std.mem.concat(vmAllocator.*, u8, &.{"https://github.com/theseyan/bkg/releases/download/", version, "/bkg_runtime-", version, "-", arch});
+    var releaseUrl = try std.mem.concat(vmAllocator, u8, &.{"https://github.com/theseyan/bkg/releases/download/", version, "/bkg_runtime-", version, "-", arch});
 
     // Create /bkg_runtime and {arch} directory if it doesn't already exist
     _ = std.fs.openDirAbsolute(runtimeDir, .{}) catch |e| {
         if(e == error.FileNotFound) try std.fs.makeDirAbsolute(runtimeDir);
     };
-    _ = std.fs.openDirAbsolute(try std.mem.concat(vmAllocator.*, u8, &.{runtimeDir, "/", arch}), .{}) catch |e| {
-        if(e == error.FileNotFound) try std.fs.makeDirAbsolute(try std.mem.concat(vmAllocator.*, u8, &.{runtimeDir, "/", arch}));
+    _ = std.fs.openDirAbsolute(try std.mem.concat(vmAllocator, u8, &.{runtimeDir, "/", arch}), .{}) catch |e| {
+        if(e == error.FileNotFound) try std.fs.makeDirAbsolute(try std.mem.concat(vmAllocator, u8, &.{runtimeDir, "/", arch}));
     };
 
     // Check if the binary already exists
