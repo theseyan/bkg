@@ -19,3 +19,6 @@
 [submodule "deps/zelda"]
 	path = deps/zelda
 	url = https://github.com/haze/zelda
+[submodule "deps/zfetch"]
+	path = deps/zfetch
+	url = https://github.com/theseyan/zfetch

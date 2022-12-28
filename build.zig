@@ -1,5 +1,5 @@
 const std = @import("std");
-const zelda = @import("deps/zelda/build.zig");
+const zfetch = @import("deps/zfetch/build.zig");
 
 pub fn build(b: *std.build.Builder) !void {
     const target = b.standardTargetOptions(.{});
@@ -10,9 +10,6 @@ pub fn build(b: *std.build.Builder) !void {
     // Strip debug symbols by default
     // Should be disabled during development/debugging
     exe.strip = false;
-
-    // Force stage1 compiler
-    //exe.use_stage1 = true;
 
     exe.linkLibC();
 
@@ -44,8 +41,8 @@ pub fn build(b: *std.build.Builder) !void {
     // Link zig-clap library
     exe.addPackagePath("clap", "deps/zig-clap/clap.zig");
 
-    // Link zelda
-    try zelda.link(b, exe, target, mode, true);
+    // Link zfetch
+    exe.addPackage(try zfetch.getPackage(b));
 
     // Link known-folders
     exe.addPackagePath("known-folders", "deps/known-folders/known-folders.zig");
