@@ -23,7 +23,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         \\  -i, --includes <str>   Comma-separated list of files to include into the binary
         \\  -t, --target <str>     Target architecture to build for (default is Host)
         \\  -b, --baseline         Use non-AVX2 (baseline) build of Bun for compatibility
-        \\  --nolto                Disable Link-Time Optimizations (not recommended)
+        \\  --lto                  Enable Link-Time Optimizations (experimental)
         \\  --targets              Display list of supported targets
         \\  -h, --help             Display this help message.
         \\  -v, --version          Display bkg version.
@@ -99,7 +99,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         try config.tryLoadConfig(allocator, try std.mem.concat(allocator, u8, &.{project, "/bkg.config.json"}));
 
         // Whether LTO is enabled
-        const isLTO = if(res.args.nolto) false else if(config.get().lto == null) false else true;
+        const isLTO = if(res.args.lto) true else if(config.get().lto == null) false else false;
 
         // List of globs to package as assets into the binary
         var includes: [][]const u8 = undefined;
@@ -130,7 +130,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
             std.debug.print("Performing Link-Time Optimizations...\n", .{});
             project = try lto.LTO(config.get().entry, config.get().lto.?.format);
         }else {
-            std.debug.print("Skipping Link-Time Optimizations because it was disabled. It is highly recommended to enable LTO in production builds.\n", .{});
+            //std.debug.print("Skipping Link-Time Optimizations because it was disabled. It is highly recommended to enable LTO in production builds.\n", .{});
         }
 
         // Build the executable
@@ -153,7 +153,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
             debug.print("{s}\n{s}\n", .{head, paramsStr});
         }
         else if (res.args.version) {
-            debug.print("0.0.3\n", .{});
+            debug.print("0.0.4\n", .{});
         }
         else if (res.args.targets) {
             debug.print("x86_64-linux\naarch64-linux\nx86_64-macos\naarch64-macos\n", .{});

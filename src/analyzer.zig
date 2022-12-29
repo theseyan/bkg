@@ -112,7 +112,13 @@ pub fn analyzeModule(allocator: std.mem.Allocator, path: []const u8) ![]const u8
 
     while (try walker.next()) |entry| {
         if(entry.kind == .Directory) continue;
+        //const fullPath = try std.mem.concat(allocator, u8, &.{path, "/", entry.path});
         const basename = std.fs.path.basename(entry.path);
+        //const stat = try std.fs.cwd().statFile(fullPath);
+        //defer allocator.free(fullPath);
+
+        // TODO: Modules having executable files are native
+        //if(stat.mode & 0o100 == 0o100) return "native";
 
         for(NativeExtensions[0..NativeExtensions.len]) |ext| {
             if(globMatch(ext, basename)) return "native";
