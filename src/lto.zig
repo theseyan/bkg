@@ -81,13 +81,13 @@ pub fn LTO(entry: []const u8, format: []const u8) ![]const u8 {
     std.debug.print("Optimizing entrypoint...\n", .{});
     const externalsString = try std.mem.concat(allocator, u8, &.{try std.mem.join(allocator, ",", externals.items), ","});
     var result = try optimizer.optimize(allocator, try std.mem.concat(allocator, u8, &.{root, "/", entry}), try std.mem.concat(allocator, u8, &.{tempDir, "/index.js"}), format, externalsString);
-    
+
     if(result.status == .Failure) {
         return error.LTOFailedOptimizeEntrypoint;
     }else if(result.status == .Warning) {
         for(result.warnings[0..result.warnings.len]) |warning| {
-            std.debug.print("Warning: `{s}` [{s}:{any}:{any}]\n", .{warning.Location.?.LineText, warning.Location.?.File, warning.Location.?.Line, warning.Location.?.Column});
-            std.debug.print("{s}\n", .{warning.Text});
+            debug.warn("Warning: `{?s}` [{?s}:{?d}:{?d}]", .{warning.Location.?.LineText, warning.Location.?.File, warning.Location.?.Line, warning.Location.?.Column});
+            debug.print("{s}", .{warning.Text});
         }
     }
     
@@ -144,7 +144,7 @@ pub fn markExternals(entry: []const u8, format: []const u8) !void {
     // Mark dynamic modules
     var dynamicModules = getDynamicModules(entryAbsolute, format) catch |e| switch(e) {
         error.SourceIsDynamic => {
-            std.debug.print("Error: Dynamic require/import found in source code! bkg is unable optimize this with LTO, please rewrite it to a static import or disable LTO with `--nolto` flag.\n", .{});
+            debug.err("Error: Dynamic require/import found in source code! bkg is unable optimize this with LTO, please rewrite it to a static import or disable LTO with `--nolto` flag.", .{});
             return e;
         },
         else => return e
@@ -245,6 +245,10 @@ pub fn getDynamicModules(entry: []const u8, format: []const u8) ![][]const u8 {
             }
         }
     }
+
+    // Free JSON resources
+    defer std.json.parseFree(optimizer.BuildResult, result.buildResult, .{.allocator = allocator, .ignore_unknown_fields = true});
+    defer allocator.destroy(result);
 
     return modules.toOwnedSlice();
 }

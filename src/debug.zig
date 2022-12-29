@@ -16,6 +16,16 @@ pub fn print(comptime msg: []const u8, args: anytype) void {
 
 }
 
+// Prints a error message
+pub fn err(comptime msg: []const u8, args: anytype) void {
+    std.debug.print("❌ " ++ msg ++ "\n", args);
+}
+
+// Prints a warning message
+pub fn warn(comptime msg: []const u8, args: anytype) void {
+    std.debug.print("⚠️ " ++ msg ++ "\n", args);
+}
+
 pub fn init(alloc: std.mem.Allocator) void {
     allocator = alloc;
 }

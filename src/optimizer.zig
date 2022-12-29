@@ -5,6 +5,7 @@ const boptimizer = @import("translated/boptimizer.zig");
 const json = std.json;
 const lto = @import("lto.zig");
 const analyzer = @import("analyzer.zig");
+const debug = @import("debug.zig");
 
 // Glob patterns to exclude when copying a module
 pub const ModuleCopyExcludes = [_][]const u8{
@@ -46,7 +47,8 @@ pub const OptimizeResult = struct {
     inputs: [][]const u8 = &.{},
     meta: struct {
         bundleSize: i64 = 0
-    }
+    },
+    buildResult: BuildResult
 };
 
 // Optimizes a module in-place, and places it on disk to a temporary location
@@ -90,7 +92,7 @@ pub fn copyModuleToDisk(allocator: std.mem.Allocator, root: []const u8, module: 
 }
 
 // Performs optimization on an entry point recursively
-pub fn optimize(allocator: std.mem.Allocator, entry: []const u8, out: []const u8, format: []const u8, externals: []const u8) !*OptimizeResult {
+pub fn optimize(allocator: std.mem.Allocator, entry: []const u8, out: []const u8, format: []const u8, externals: []u8) !*OptimizeResult {
 
     const entrySentinel = try std.mem.concatWithSentinel(allocator, u8, &.{entry}, 0); 
     const outSentinel = try std.mem.concatWithSentinel(allocator, u8, &.{out}, 0);
@@ -154,8 +156,8 @@ pub fn optimize(allocator: std.mem.Allocator, entry: []const u8, out: []const u8
         optimizeResult.inputs = try inputsArrayList.toOwnedSlice();
     }
 
-    // Free parsed struct
-    json.parseFree(BuildResult, buildResult, .{.allocator = allocator, .ignore_unknown_fields = true});
+    // Save struct so we can free it later
+    optimizeResult.buildResult = buildResult;
 
     return optimizeResult;
 
