@@ -1,6 +1,9 @@
 const std = @import("std");
 const zfetch = @import("deps/zfetch/build.zig");
 
+// Path to macOS SDK for macOS cross compilation
+const MACOS_SDK = "/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root";
+
 pub fn build(b: *std.build.Builder) !void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
@@ -19,12 +22,14 @@ pub fn build(b: *std.build.Builder) !void {
     }else if(target.getOs().tag == .linux and target.getCpu().arch == .aarch64) {
         exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-aarch64-linux.a");
     }else if(target.getOs().tag == .macos and target.getCpu().arch == .x86_64) {
-        b.sysroot = "/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root";
-        exe.addLibraryPath("/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root/usr/lib");
-        exe.addFrameworkPath("/home/theseyan/Go/bOptimizer/build/sdk-macos-12.0-main/root/System/Library/Frameworks");
+        b.sysroot = MACOS_SDK;
+        exe.addFrameworkPath(MACOS_SDK ++ "/System/Library/Frameworks");
         exe.linkFramework("CoreFoundation");
         exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-x86_64-macos.a");
     }else if(target.getOs().tag == .macos and target.getCpu().arch == .aarch64) {
+        b.sysroot = MACOS_SDK;
+        exe.addFrameworkPath(MACOS_SDK ++ "/System/Library/Frameworks");
+        exe.linkFramework("CoreFoundation");
         exe.addObjectFile("deps/bOptimizer/build/out/libboptimizer-aarch64-macos.a");
     }
 
