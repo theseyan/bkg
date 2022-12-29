@@ -143,7 +143,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         }
         
         // Finish up
-        std.debug.print("Built {s} for target {s}.\n", .{std.fs.path.basename(out), target});
+        std.debug.print("⚡ Built {s} for target {s}.\n", .{std.fs.path.basename(out), target});
 
     }
     // Parse other CLI flags

@@ -186,16 +186,21 @@ pub fn compressArchive(allocator: std.mem.Allocator, buf: []u8, target: []const 
         var compSizeBuffer: []u8 = try std.fmt.allocPrint(allocator, "{d}", .{compSize});
         var hashBuffer: []u8 = try std.fmt.allocPrint(allocator, "{d}", .{hash});
         var compSizeBuf10 = try allocator.alloc(u8, 10);
+        var hashBuf10 = try allocator.alloc(u8, 10);
         defer allocator.free(compSizeBuffer);
         defer allocator.free(hashBuffer);
 
-        // Fill empty bytes of compSizeBuf with 0s
+        // Fill empty bytes with 0s
         for(compSizeBuf10[0..10]) |_, i| {
             if(i >= compSizeBuffer.len) { compSizeBuf10[i] = 0; }
             else { compSizeBuf10[i] = compSizeBuffer[i]; }
         }
+        for(hashBuf10[0..10]) |_, i| {
+            if(i >= hashBuffer.len) { hashBuf10[i] = 0; }
+            else { hashBuf10[i] = hashBuffer[i]; }
+        }
 
-        _ = try file.writeAll(hashBuffer);
+        _ = try file.writeAll(hashBuf10);
         _ = try file.writeAll(compSizeBuf10);
     }
 

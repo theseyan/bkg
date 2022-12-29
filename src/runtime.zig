@@ -41,15 +41,15 @@ pub fn parseBinary(allocator: std.mem.Allocator, path: []const u8) anyerror!Pars
 
     // Parse into usize
     var nullIndex = std.mem.indexOfScalar(u8, compSizeBuf, 0) orelse 10;
+    var crcNullIndex = std.mem.indexOfScalar(u8, crcBuf, 0) orelse 10;
 
-    //var crc32 = try allocator.dupe(u8, crcBuf);
     var compSize = std.fmt.parseInt(usize, compSizeBuf[0..nullIndex], 0) catch {
         return error.FailedParseCompressedSize;
     };
 
     return ParseResult{
         .compressed = compSize,
-        .hash = try allocator.dupe(u8, crcBuf[0..10])
+        .hash = try allocator.dupe(u8, crcBuf[0..crcNullIndex])
     };
 
 }
@@ -129,7 +129,11 @@ pub fn extractArchive(allocator: std.mem.Allocator, target: []const u8, root: []
     // Perform LZ4 decompression
     var result = lz4.LZ4_decompress_safe(buf[0..parsed.compressed].ptr, decompressed.ptr, @intCast(c_int, parsed.compressed), 1024 * 1024 * 1024);
 
-    //std.debug.print("[{any}] Decompressed {any} bytes to memory\n", .{std.time.milliTimestamp() - debug.startTime, result});
+    // Validate decompression
+    if(result < 0) {
+        debug.err("Failed to decompress payload!", .{});
+        return error.FailedDecompressPayload;
+    }
 
     // Open decompressed archive
     var tar: mtar.mtar_t = std.mem.zeroes(mtar.mtar_t);

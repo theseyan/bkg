@@ -86,12 +86,11 @@ pub fn LTO(entry: []const u8, format: []const u8) ![]const u8 {
         return error.LTOFailedOptimizeEntrypoint;
     }else if(result.status == .Warning) {
         for(result.warnings[0..result.warnings.len]) |warning| {
-            debug.warn("Warning: `{?s}` [{?s}:{?d}:{?d}]", .{warning.Location.?.LineText, warning.Location.?.File, warning.Location.?.Line, warning.Location.?.Column});
-            debug.print("{s}", .{warning.Text});
+            debug.warn("Warning: `{?s}` [{?s}:{?d}:{?d}]\n{s}", .{warning.Location.?.LineText, warning.Location.?.File, warning.Location.?.Line, warning.Location.?.Column, warning.Text});
         }
     }
     
-    std.debug.print("⚡ Bundled and optimized application code ({any} KiB)!\n", .{@divTrunc(result.meta.bundleSize, 1024)});
+    std.debug.print("Bundled and optimized application code ({any} KiB)!\n", .{@divTrunc(result.meta.bundleSize, 1024)});
     return tempDir;
 
 }
