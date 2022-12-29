@@ -153,7 +153,6 @@ pub fn markExternals(entry: []const u8, format: []const u8) !void {
     for(dynamicModules[0..dynamicModules.len]) |module| {
         recursiveMark(module);
     }
-
 }
 
 // Marks given module and it's native/dynamic dependencies recursively as external

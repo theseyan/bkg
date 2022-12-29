@@ -28,8 +28,14 @@ pub fn init(allocator: std.mem.Allocator) !void {
 }
 
 // Analyzer
-pub fn analyze(allocator: std.mem.Allocator, root: []const u8) !*std.ArrayList(Module) {
-    var dir = try std.fs.openIterableDirAbsolute(root, .{});
+pub fn analyze(allocator: std.mem.Allocator, root: []const u8) !*const std.ArrayList(Module) {
+    var dir = std.fs.openIterableDirAbsolute(root, .{}) catch |e| switch (e) {
+        error.FileNotFound => {
+            // node_modules is absent, this project has no dependencies
+            return &modules;
+        },
+        else => return e
+    };
     defer dir.close();
     var walker = try dir.walk(allocator);
 
