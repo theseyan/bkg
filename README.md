@@ -59,6 +59,23 @@ bkg and pkg (Node) have a number of differences arising either from a design dec
 - **File system:** bkg does not embed a virtual filesystem but instead archives sources using the very fast [LZ4 compression](https://github.com/lz4/lz4) which are decompressed to a temporary location at runtime. This makes the resulting binary about 1/2 the size of Bun itself, while not having to keep the entire runtime in memory.
 - **Import resolution:** Unlike pkg, we do not recursively traverse through each import in the sources and package those files (yet). bkg will simply archive the entire source folder - this will change in version 1.0.
 
+## Link-Time Optimizations
+Since v0.0.4, bkg has support for an experimental LTO mode.
+
+When LTO is enabled, bkg will attempt to statically analyze your code, bundle sources and perform tree shaking/minification at compile time.
+For large projects, this drastically reduces application size and boosts cold startup times.
+
+To enable LTO, compile with `--lto` or add the following field to `bkg.config.json`:
+```json
+{
+    "lto": {
+        "format": "cjs"
+    }
+}
+```
+
+Only reachable code is packaged into the executable; To include additional assets, use `--include "path/to/files/*"` or `lto.includes` field in configuration.
+
 ## Key takeaways
 
 - bkg is **not** meant for very dynamic environments (for eg. serverless), as it adds considerable overhead to startup time. However, this overhead is only valid for the first start as the decompressed sources are cached in the filesystem onwards.
@@ -67,7 +84,7 @@ bkg and pkg (Node) have a number of differences arising either from a design dec
 
 # Building from source
 bkg is written in Zig and compilation is fairly straightforward. The prerequisites are:
-- Zig version [0.10.0-dev.3554+bfe8a4d9f](https://ziglang.org/builds/zig-0.10.0-dev.3554+bfe8a4d9f.tar.xz)
+- Zig version [0.11.0-dev.944+a193ec432](https://ziglang.org/builds/zig-0.11.0-dev.944+a193ec432.tar.xz)
 
 ```bash
 # Clone the repository and update submodules
@@ -78,7 +95,7 @@ git submodule update --init --recursive
 zig build -Drelease-fast -Dtarget=x86_64-linux
 
 # [Optional] Build runtime for x86_64-linux & strip it
-zig build-exe -target x86_64-linux src/bkg_runtime.zig --strip -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
+zig build-exe -target x86_64-linux src/bkg_runtime.zig -fstrip -lc deps/lz4/lib/lz4.c deps/microtar/src/microtar.c --pkg-begin known-folders deps/known-folders/known-folders.zig --pkg-end
 
 # Run bkg
 ./zig-out/bin/bkg --help
@@ -93,7 +110,7 @@ chmod +x build.sh && ./build.sh
 **Release v0.1.0:**
 - :white_check_mark: ~~Switch to LZ4 high compression variant that compresses more but doesn't affect decompression speed (and shaves off 7MB!)~~
 - :white_check_mark: ~~Runtime: Stream decompressed buffer directly to microtar instead of through the filesystem. This will greatly improve startup time.~~
-- Compiler: Stream archive directly to `LZ4_compress_HC` instead of through the filesystem
+- :white_check_mark: ~~Compiler: Stream archive directly to `LZ4_compress_HC` instead of through the filesystem~~
 - :white_check_mark: ~~Use [zfetch](https://github.com/truemedian/zfetch) instead of cURL~~
 - :white_check_mark: ~~JSON configuration file~~
 - :white_check_mark: ~~Pass CLI args to javascript~~
@@ -107,7 +124,7 @@ chmod +x build.sh && ./build.sh
 - Prebuild, postbuild options and CLI argument counterparts of `bkg.config.json`
 - Pass Bun CLI flags
 - Fork a custom build of Bun with only the JS runtime to further reduce binary size
-- Multithreaded decompression for even faster cold starts
+- :white_check_mark: ~~Multithreaded decompression for even faster cold starts~~
 
 **Optimizer Progress:**
 See [bOptimizer](https://github.com/theseyan/boptimizer).
