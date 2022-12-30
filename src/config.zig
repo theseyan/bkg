@@ -21,10 +21,7 @@ pub const Config = struct {
 pub const defaultConfig: Config = .{
     .entry = "index.js",
     .debug = false,
-    .lto = .{
-        .format = "cjs",
-        .includes = &.{}
-    }
+    .lto = null
 };
 
 // Stores the configuration
