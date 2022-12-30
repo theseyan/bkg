@@ -20,13 +20,10 @@ pub fn build(allocator: std.mem.Allocator, bunPath: []const u8, bkgPath: []const
     }
     
     // Copy bkg runtime to temporary directory
-    try std.fs.copyFileAbsolute(bkgPath, "/tmp/__bkg_build_runtime", .{});
+    try std.fs.copyFileAbsolute(bkgPath, out, .{});
 
     // Build archive and apply compression
-    try compressArchive(allocator, try buildArchive(allocator, bunPath, project, isDebug), "/tmp/__bkg_build_runtime");
-
-    // Rename executable
-    try std.fs.renameAbsolute("/tmp/__bkg_build_runtime", out);
+    try compressArchive(allocator, try buildArchive(allocator, bunPath, project, isDebug), out);
 
     // Give executable permissions
     var file: ?std.fs.File = std.fs.openFileAbsolute(out, .{}) catch |e| switch(e) {
