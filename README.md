@@ -52,15 +52,8 @@ bkg assumes `index.js` to be the entry point of your application. This can be ch
 - No performance regression except for the first startup
 - Although not yet possible, the goal is generating bytecode and the ability to distribute binaries stripped of sources
 
-## Differences from `pkg`
-
-bkg and pkg (Node) have a number of differences arising either from a design decision or a Bun limitation:
-- **Sources are not compiled to bytecode:** Bun does not expose a JavascriptCore equivalent of `v8::ScriptCompiler` yet, hence sources are kept intact in the compiled executable.
-- **File system:** bkg does not embed a virtual filesystem but instead archives sources using the very fast [LZ4 compression](https://github.com/lz4/lz4) which are decompressed to a temporary location at runtime. This makes the resulting binary about 1/2 the size of Bun itself, while not having to keep the entire runtime in memory.
-- **Import resolution:** Unlike pkg, we do not recursively traverse through each import in the sources and package those files (yet). bkg will simply archive the entire source folder - this will change in version 1.0.
-
-## Link-Time Optimizations
-Since v0.0.4, bkg has support for an experimental LTO mode.
+## Link-Time Optimizations (LTO)
+Since `v0.0.4`, bkg has support for an experimental LTO mode.
 
 When LTO is enabled, bkg will attempt to statically analyze your code, bundle sources and perform tree shaking/minification at compile time.
 For large projects, this drastically reduces application size and boosts cold startup times.
@@ -74,7 +67,14 @@ To enable LTO, compile with `--lto` or add the following field to `bkg.config.js
 }
 ```
 
-Only reachable code is packaged into the executable; To include additional assets, use `--include "path/to/files/*"` or `lto.includes` field in configuration.
+Only reachable code is packaged into the executable; To include additional assets, use `--include "path/to/files/*"` flag or set the `lto.includes` field in configuration with a comma-separated list of glob file paths.
+
+## Differences from `pkg`
+
+bkg and pkg (Node) have a number of differences arising either from a design decision or a Bun limitation:
+- **Sources are not compiled to bytecode:** Bun does not expose a JavascriptCore equivalent of `v8::ScriptCompiler` yet, hence sources are kept intact in the compiled executable.
+- **File system:** bkg does not embed a virtual filesystem but instead archives sources using the very fast [LZ4 compression](https://github.com/lz4/lz4) which are decompressed to a temporary location at runtime. This makes the resulting binary about 1/2 the size of Bun itself, while not having to keep the entire runtime in memory.
+- **Import resolution:** Unlike pkg, we do not recursively traverse through each import in the sources and package those files (yet). bkg will simply archive the entire source folder - this will change in version 1.0.
 
 ## Key takeaways
 
