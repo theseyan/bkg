@@ -99,7 +99,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         try config.tryLoadConfig(allocator, try std.mem.concat(allocator, u8, &.{project, "/bkg.config.json"}));
 
         // Whether LTO is enabled
-        const isLTO = if(res.args.lto) true else if(config.get().lto == null) false else false;
+        const isLTO = if(res.args.lto) true else if(config.get().lto != null) true else false;
 
         // List of globs to package as assets into the binary
         var includes: [][]const u8 = undefined;
