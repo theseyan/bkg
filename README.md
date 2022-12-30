@@ -5,7 +5,7 @@
 Package Bun apps into a single executable
 </i>
 <br><br>
-<img alt="GitHub Workflow Status" src="https://img.shields.io/github/workflow/status/theseyan/bkg/CI">
+<img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/theseyan/bkg/CI.yml?branch=main">
 
 <br><br>
 </div>
