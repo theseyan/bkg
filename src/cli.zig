@@ -104,14 +104,14 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
         // List of globs to package as assets into the binary
         var includes: [][]const u8 = undefined;
 
-        if(res.args.includes != null) {
+        if(res.args.includes != null and isLTO) {
             var iterator = std.mem.split(u8, res.args.includes.?, ",");
             var list = std.ArrayList([]const u8).init(allocator);
             while(iterator.next()) |glob| {
                 try list.append(glob);
             }
             includes = try list.toOwnedSlice();
-        }else {
+        }else if(isLTO) {
             includes = config.get().lto.?.includes;
         }
 
