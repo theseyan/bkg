@@ -9,11 +9,7 @@ pub const Config = struct {
     lto: ?struct {                      // Link-Time Optimization
         format: []const u8 = "cjs",     // "cjs" or "esm"
         includes: [][]const u8 = &.{},  // Globs of file paths to package as assets into the binary
-    } = .{
-        .format = "cjs",
-        .includes = &.{},
-
-    }
+    } = null
 };
 
 // Default configuration JSON
