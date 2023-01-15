@@ -81,7 +81,9 @@ pub fn copyModuleToDisk(allocator: std.mem.Allocator, root: []const u8, module: 
 
     walkerLoop: while (try walker.next()) |entry| {
         // Ignore files/folder that are excluded
-        for(ModuleCopyExcludes[0..ModuleCopyExcludes.len]) |glob| { if(analyzer.globMatch(glob, entry.path)) continue :walkerLoop; }
+        inline for(ModuleCopyExcludes[0..ModuleCopyExcludes.len]) |glob| {
+            if(analyzer.globMatchComptime(glob, entry.path)) continue :walkerLoop;
+        }
 
         if(entry.kind == .Directory) {
             try std.fs.makeDirAbsolute(try std.mem.concat(allocator, u8, &.{modulePath, "/", entry.path}));

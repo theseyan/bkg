@@ -120,8 +120,8 @@ pub fn analyzeModule(allocator: std.mem.Allocator, path: []const u8) ![]const u8
         // TODO: Modules having executable files are native
         //if(stat.mode & 0o100 == 0o100) return "native";
 
-        for(NativeExtensions[0..NativeExtensions.len]) |ext| {
-            if(globMatch(ext, basename)) return "native";
+        inline for(NativeExtensions[0..NativeExtensions.len]) |ext| {
+            if(globMatchComptime(ext, basename)) return "native";
         }
     }
 
@@ -208,12 +208,34 @@ pub fn isModule(allocator: std.mem.Allocator, path: []const u8) !bool {
     }
 }
 
-// Tests a path string against a glob
+// Tests a path string against a glob pattern
 pub fn globMatch(pattern: []const u8, str: []const u8) bool {
     if (std.mem.eql(u8, pattern, "*")) return true;
 
     var i: usize = 0;
     var it = std.mem.tokenize(u8, pattern, "*");
+    var exact_begin = pattern.len > 0 and pattern[0] != '*';
+
+    while (it.next()) |substr| {
+        if (std.mem.indexOf(u8, str[i..], substr)) |j| {
+            if (exact_begin) {
+                if (j != 0) return false;
+                exact_begin = false;
+            }
+
+            i += j + substr.len;
+        } else return false;
+    }
+
+    return if (pattern[pattern.len - 1] == '*') true else i == str.len;
+}
+
+// Comptime variant of globMatch
+pub fn globMatchComptime(comptime pattern: []const u8, str: []const u8) bool {
+    if (comptime std.mem.eql(u8, pattern, "*")) return true;
+
+    var i: usize = 0;
+    var it = comptime std.mem.tokenize(u8, pattern, "*");
     var exact_begin = pattern.len > 0 and pattern[0] != '*';
 
     while (it.next()) |substr| {

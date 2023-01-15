@@ -129,7 +129,7 @@ pub fn markExternals(entry: []const u8, format: []const u8) !void {
     leafModules = std.ArrayList([]const u8).init(allocator);
 
     // Mark forced external modules
-    for(ForcedExternalModules[0..ForcedExternalModules.len]) |module| {
+    inline for(ForcedExternalModules[0..ForcedExternalModules.len]) |module| {
         recursiveMark(module);
     }
 
@@ -187,7 +187,7 @@ pub fn recursiveMark(module: []const u8) void {
 
 // Checks if given module is in allowed list of exceptions
 pub fn checkAllowedDynamicModule(module: []const u8) bool {
-    for(AllowedDynamicModules[0..AllowedDynamicModules.len]) |mod| {
+    inline for(AllowedDynamicModules[0..AllowedDynamicModules.len]) |mod| {
         if(std.mem.eql(u8, mod, module)) return true;
     }
     return false;
