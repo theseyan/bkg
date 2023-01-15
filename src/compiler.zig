@@ -209,8 +209,7 @@ pub fn compressArchive(allocator: std.mem.Allocator, buf: []u8, target: []const 
 }
 
 // Creates and returns a standard target string for Host OS
-pub fn getHostTargetString(allocator: std.mem.Allocator) ![]const u8 {
-
+pub fn getHostTargetString() ![]const u8 {
     const tag = builtin.target.os.tag;
     const arch = builtin.target.cpu.arch;
     
@@ -227,7 +226,6 @@ pub fn getHostTargetString(allocator: std.mem.Allocator) ![]const u8 {
         else => return error.UnknownCpu
     };
 
-    const target = try std.mem.concat(allocator, u8, &.{archStr, "-", tagStr});
+    const target = archStr ++ "-" ++ tagStr;
     return target;
-
 }

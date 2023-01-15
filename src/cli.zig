@@ -74,7 +74,7 @@ pub fn init(allocator: std.mem.Allocator) anyerror!void {
             target = res.args.target.?;
             debug.print("Building for target {s}\n", .{res.args.target.?});
         }else {
-            target = try compiler.getHostTargetString(allocator);
+            target = try comptime compiler.getHostTargetString();
             debug.print("No target was specified, building for {s}\n", .{target});
         }
 
