@@ -232,13 +232,13 @@ pub fn globMatch(pattern: []const u8, str: []const u8) bool {
 
 // Comptime variant of globMatch
 pub fn globMatchComptime(comptime pattern: []const u8, str: []const u8) bool {
-    if (comptime std.mem.eql(u8, pattern, "*")) return true;
+    comptime if (std.mem.eql(u8, pattern, "*")) return true;
 
     var i: usize = 0;
-    var it = comptime std.mem.tokenize(u8, pattern, "*");
-    var exact_begin = pattern.len > 0 and pattern[0] != '*';
+    comptime var it = std.mem.tokenize(u8, pattern, "*");
+    var exact_begin = comptime pattern.len > 0 and pattern[0] != '*';
 
-    while (it.next()) |substr| {
+    inline while (comptime it.next()) |substr| {
         if (std.mem.indexOf(u8, str[i..], substr)) |j| {
             if (exact_begin) {
                 if (j != 0) return false;
@@ -249,5 +249,5 @@ pub fn globMatchComptime(comptime pattern: []const u8, str: []const u8) bool {
         } else return false;
     }
 
-    return if (pattern[pattern.len - 1] == '*') true else i == str.len;
+    return comptime if (pattern[pattern.len - 1] == '*') true else i == str.len;
 }
